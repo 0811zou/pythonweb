@@ -1,0 +1,6 @@
+# Git 忽略
+__pycache__/
+db.sqlite3
+venv/
+.env
+media/
