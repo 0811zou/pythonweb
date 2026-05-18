@@ -1,0 +1,47 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: agro
+      POSTGRES_USER: agro
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-agro_pass}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  web:
+    build: .
+    restart: unless-stopped
+    command: gunicorn config.wsgi:application --bind 0.0.0.0:8000
+    environment:
+      - DEBUG=0
+      - SECRET_KEY=${SECRET_KEY}
+      - DATABASE_URL=postgres://agro:${POSTGRES_PASSWORD}@db:5432/agro
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-}
+      - ADMIN_EMAIL=${ADMIN_EMAIL:-}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-}
+    volumes:
+      - .:/app
+      - static_volume:/app/static
+      - media_volume:/app/media
+    depends_on:
+      - db
+  nginx:
+    image: nginx:stable
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
+      - static_volume:/app/static
+      - media_volume:/app/media
+      - certs:/etc/letsencrypt
+    depends_on:
+      - web
+volumes:
+  postgres_data:
+  static_volume:
+  media_volume:
+  certs:
