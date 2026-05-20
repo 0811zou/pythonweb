@@ -1,0 +1,12 @@
+venv/
+.git/
+__pycache__/
+*.pyc
+*.pyo
+pythonweb_app.tar
+.env*
+db.sqlite3
+.DS_Store
+*.md
+deploy/
+docs/

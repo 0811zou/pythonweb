@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}农产品列表 - 绿农溯源{% endblock %}
+
+{% block content %}
+<section class="py-4" style="background: linear-gradient(135deg, #e8f5e9, #f1f8e9);">
+  <div class="container">
+    <h1 class="section-title mb-1">🌾 全部农产品</h1>
+    <p class="text-muted">每一份产品都可追溯，买得放心吃得安心</p>
+    <div class="row mt-3">
+      <div class="col-md-6">
+        <input type="text" class="search-box" id="searchInput" placeholder="搜索产品名称…" oninput="filterProducts()">
+      </div>
+      <div class="col-md-3">
+        <select class="form-select" id="categoryFilter" onchange="filterProducts()">
+          <option value="">全部分类</option>
+          <option value="水果">水果</option>
+          <option value="蔬菜">蔬菜</option>
+          <option value="谷物">谷物</option>
+          <option value="畜禽">畜禽产品</option>
+          <option value="其他">其他</option>
+        </select>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="py-4">
+  <div class="container">
+    <div class="row g-4" id="product-grid">
+      <div class="col-12 text-center py-5">
+        <div class="loading-spinner">
+          <div class="spinner-border text-success" role="status"><span class="visually-hidden">加载中…</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+let allProducts = [];
+
+fetch('/api/products/')
+  .then(r => r.json())
+  .then(data => {
+    allProducts = Array.isArray(data) ? data : [];
+    renderProducts(allProducts);
+  })
+  .catch(() => {
+    document.getElementById('product-grid').innerHTML = '<div class="col-12 text-center py-5 text-muted">加载失败，请刷新重试</div>';
+  });
+
+function renderProducts(list) {
+  const grid = document.getElementById('product-grid');
+  if (list.length === 0) {
+    grid.innerHTML = '<div class="col-12 text-center py-5 text-muted">暂无产品</div>';
+    return;
+  }
+  grid.innerHTML = list.map(p => `
+    <div class="col-lg-3 col-md-4 col-6">
+      <div class="card h-100">
+        <div class="card-img-top d-flex align-items-center justify-content-center" style="background:#e8f5e9;font-size:3rem;color:#2d8a4e;">
+          <i class="bi bi-${p.category === '水果' ? 'apple' : p.category === '蔬菜' ? 'flower1' : p.category === '谷物' ? 'flower2' : 'basket'}"></i>
+        </div>
+        <div class="card-body d-flex flex-column">
+          <span class="badge-trace mb-1" style="align-self:flex-start;">${p.category || '农产品'}</span>
+          <h5 class="card-title">${p.name}</h5>
+          <p class="card-text small flex-grow-1">${p.description ? p.description.substring(0,80) : '来自优质产地的健康农产品'}</p>
+          <div class="d-flex justify-content-between align-items-center mt-auto">
+            <span class="price">¥${parseFloat(p.price).toFixed(2)} <small>/ ${p.unit||'kg'}</small></span>
+            <a href="/products/${p.id}/" class="btn btn-sm btn-outline-primary">详情 <i class="bi bi-arrow-right"></i></a>
+          </div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function filterProducts() {
+  const q = document.getElementById('searchInput').value.toLowerCase();
+  const cat = document.getElementById('categoryFilter').value;
+  const filtered = allProducts.filter(p => {
+    if (q && !p.name.toLowerCase().includes(q)) return false;
+    if (cat && p.category !== cat) return false;
+    return true;
+  });
+  renderProducts(filtered);
+}
+</script>
+{% endblock %}

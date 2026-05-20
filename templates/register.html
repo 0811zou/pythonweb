@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}注册 - 绿农溯源{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="auth-card">
+    <div class="text-center mb-3">
+      <span class="brand-icon" style="display:inline-flex;margin:0 auto;"><i class="bi bi-tree-fill"></i></span>
+    </div>
+    <h2>创建账号</h2>
+    <form method="post">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label">用户名</label>
+        <input type="text" name="username" class="form-control" placeholder="输入用户名" required maxlength="150">
+        <div class="form-text small">必填。150个字符以内。仅包含字母、数字和 @/./+/-/_ 。</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">邮箱</label>
+        <input type="email" name="email" class="form-control" placeholder="your@email.com">
+      </div>
+      <div class="mb-3">
+        <label class="form-label">密码</label>
+        <input type="password" name="password1" class="form-control" placeholder="设置密码" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">确认密码</label>
+        <input type="password" name="password2" class="form-control" placeholder="再次输入密码" required>
+      </div>
+      {% if form.errors %}
+        <div class="alert alert-danger">
+          {% for field, errors in form.errors.items %}
+            {% for error in errors %}<p class="mb-0">{{ error }}</p>{% endfor %}
+          {% endfor %}
+        </div>
+      {% endif %}
+      <button type="submit" class="btn btn-primary w-100 py-2"><i class="bi bi-person-plus"></i> 注册</button>
+    </form>
+    <p class="text-center mt-3 mb-0 small text-muted">
+      已有账号？<a href="{% url 'login' %}">立即登录</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

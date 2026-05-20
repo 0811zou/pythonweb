@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}登录 - 绿农溯源{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="auth-card">
+    <div class="text-center mb-3">
+      <span class="brand-icon" style="display:inline-flex;margin:0 auto;"><i class="bi bi-tree-fill"></i></span>
+    </div>
+    <h2>欢迎回来</h2>
+    <form method="post">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label">用户名</label>
+        <input type="text" name="username" class="form-control" placeholder="输入用户名" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">密码</label>
+        <input type="password" name="password" class="form-control" placeholder="输入密码" required>
+      </div>
+      {% if form.errors %}
+        <div class="alert alert-danger">用户名或密码错误，请重试</div>
+      {% endif %}
+      <button type="submit" class="btn btn-primary w-100 py-2"><i class="bi bi-box-arrow-in-right"></i> 登录</button>
+    </form>
+    <p class="text-center mt-3 mb-0 small text-muted">
+      还没有账号？<a href="{% url 'register' %}">立即注册</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}绿农溯源 - 农产品溯源与助农平台{% endblock %}</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  {% load static %}
+  <link href="{% static 'css/style.css' %}" rel="stylesheet">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg sticky-top">
+    <div class="container">
+      <a class="navbar-brand" href="/">
+        <span class="brand-icon"><i class="bi bi-tree-fill"></i></span>
+        绿农溯源
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item"><a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/"><i class="bi bi-house-door"></i> 首页</a></li>
+          <li class="nav-item"><a class="nav-link {% if '/products' in request.path %}active{% endif %}" href="/products/"><i class="bi bi-basket"></i> 农产品</a></li>
+          <li class="nav-item"><a class="nav-link {% if '/trace/' in request.path %}active{% endif %}" href="/trace/"><i class="bi bi-qr-code-scan"></i> 溯源查询</a></li>
+        </ul>
+        <div class="d-flex align-items-center gap-2">
+          {% if user.is_authenticated %}
+            <span class="text-muted small me-2"><i class="bi bi-person-circle"></i> {{ user.username }}</span>
+            <a href="/admin/" class="btn btn-outline-primary btn-sm"><i class="bi bi-gear"></i> 管理</a>
+            <a href="{% url 'logout' %}" class="btn btn-outline-danger btn-sm"><i class="bi bi-box-arrow-right"></i> 退出</a>
+          {% else %}
+            <a href="{% url 'login' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-box-arrow-in-right"></i> 登录</a>
+            <a href="{% url 'register' %}" class="btn btn-primary btn-sm"><i class="bi bi-person-plus"></i> 注册</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Messages -->
+  {% if messages %}
+  <div class="container mt-3">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Content -->
+  {% block content %}{% endblock %}
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="row g-4">
+        <div class="col-md-4">
+          <h5><i class="bi bi-tree-fill text-success"></i> 绿农溯源</h5>
+          <p>连接农户与消费者，让每一份农产品都有源可溯、有迹可查。</p>
+        </div>
+        <div class="col-md-2">
+          <h5>快速链接</h5>
+          <a href="/">首页</a>
+          <a href="/products/">农产品</a>
+          <a href="/trace/">溯源查询</a>
+        </div>
+        <div class="col-md-3">
+          <h5>帮助支持</h5>
+          <a href="/admin/">管理后台</a>
+          <a href="https://github.com/0811zou/pythonweb" target="_blank">GitHub 项目</a>
+        </div>
+        <div class="col-md-3">
+          <h5>联系我们</h5>
+          <p class="mb-1"><i class="bi bi-envelope"></i> support@agro-trace.com</p>
+          <p><i class="bi bi-telephone"></i> 400-888-0000</p>
+        </div>
+      </div>
+      <hr class="my-3" style="border-color: rgba(255,255,255,0.1);">
+      <p class="text-center mb-0 small">© {% now "Y" %} 绿农溯源 - 农产品溯源与助农平台. All rights reserved.</p>
+    </div>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>
