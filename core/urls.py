@@ -7,6 +7,9 @@ from .views import (
     trace_query_view, login_view, logout_view, register_view,
     dashboard_stats, dashboard_view,
     demand_analysis, market_analysis_view,
+    farmer_dashboard, farmer_products, farmer_product_create,
+    farmer_product_edit, farmer_product_delete, farmer_product_submit,
+    admin_dashboard, admin_products, admin_product_review, admin_users,
 )
 
 router = routers.DefaultRouter()
@@ -30,4 +33,16 @@ urlpatterns = [
     path('api/analysis/demand/', demand_analysis, name='demand_analysis'),
     path('dashboard/', dashboard_view, name='dashboard'),
     path('market/', market_analysis_view, name='market_analysis'),
+    # 农户端
+    path('farmer/', farmer_dashboard, name='farmer_dashboard'),
+    path('farmer/products/', farmer_products, name='farmer_products'),
+    path('farmer/products/create/', farmer_product_create, name='farmer_product_create'),
+    path('farmer/products/<int:pk>/edit/', farmer_product_edit, name='farmer_product_edit'),
+    path('farmer/products/<int:pk>/delete/', farmer_product_delete, name='farmer_product_delete'),
+    path('farmer/products/<int:pk>/submit/', farmer_product_submit, name='farmer_product_submit'),
+    # 管理端
+    path('manage/', admin_dashboard, name='admin_dashboard'),
+    path('manage/products/', admin_products, name='admin_products'),
+    path('manage/products/<int:pk>/<str:action>/', admin_product_review, name='admin_product_review'),
+    path('manage/users/', admin_users, name='admin_users'),
 ]

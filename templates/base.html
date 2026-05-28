@@ -32,8 +32,13 @@
         </ul>
         <div class="d-flex align-items-center gap-2">
           {% if user.is_authenticated %}
+            {% if user.is_staff %}
+              <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-danger btn-sm"><i class="bi bi-shield-lock"></i> 管理后台</a>
+            {% endif %}
+            {% if user.farmerprofile %}
+              <a href="{% url 'farmer_dashboard' %}" class="btn btn-outline-success btn-sm"><i class="bi bi-person-circle"></i> 农户工作台</a>
+            {% endif %}
             <span class="text-muted small me-2"><i class="bi bi-person-circle"></i> {{ user.username }}</span>
-            <a href="/admin/" class="btn btn-outline-primary btn-sm"><i class="bi bi-gear"></i> 管理</a>
             <a href="{% url 'logout' %}" class="btn btn-outline-danger btn-sm"><i class="bi bi-box-arrow-right"></i> 退出</a>
           {% else %}
             <a href="{% url 'login' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-box-arrow-in-right"></i> 登录</a>

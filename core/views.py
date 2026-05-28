@@ -11,7 +11,7 @@ from .models import Product, ProductBatch, Order, OrderItem, SubsidyApplication,
 from .serializers import ProductSerializer, ProductBatchSerializer, OrderSerializer, SubsidyApplicationSerializer, TrainingSerializer
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.select_related('farmer').all()
+    queryset = Product.objects.select_related('farmer').filter(status='approved')
     serializer_class = ProductSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
@@ -240,3 +240,185 @@ def demand_analysis(request):
 def market_analysis_view(request):
     """市场分析页面"""
     return render(request, 'market_analysis.html')
+
+
+# ===== 农户端功能 =====
+
+def farmer_required(view_func):
+    """装饰器：检查用户是否为农户"""
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('login')
+        try:
+            request.farmer_profile = request.user.farmerprofile
+        except FarmerProfile.DoesNotExist:
+            messages.error(request, '请先注册为农户')
+            return redirect('register')
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+def farmer_dashboard(request):
+    """农户工作台"""
+    profile = request.user.farmerprofile
+    products = Product.objects.filter(farmer=profile).order_by('-created_at')
+@farmer_required
+def farmer_dashboard(request):
+    """农户工作台"""
+    profile = request.farmer_profile
+    products = Product.objects.filter(farmer=profile).order_by('-created_at')
+    stats = {
+        'total': products.count(),
+        'approved': products.filter(status='approved').count(),
+        'pending': products.filter(status='pending').count(),
+        'draft': products.filter(status='draft').count(),
+    }
+    return render(request, 'farmer/dashboard.html', {'products': products, 'stats': stats})
+    stats = {
+        'total': products.count(),
+        'approved': products.filter(status='approved').count(),
+        'pending': products.filter(status='pending').count(),
+        'draft': products.filter(status='draft').count(),
+    }
+    return render(request, 'farmer/dashboard.html', {'products': products, 'stats': stats})
+
+
+def farmer_products(request):
+    """农户产品管理"""
+    return redirect('farmer_dashboard')
+
+
+def farmer_product_create(request):
+    """农户添加产品"""
+    profile = request.user.farmerprofile
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        category = request.POST.get('category', '').strip()
+        variety = request.POST.get('variety', '').strip()
+        description = request.POST.get('description', '').strip()
+        price = request.POST.get('price', '0')
+        unit = request.POST.get('unit', 'kg')
+        if not name:
+            messages.error(request, '请输入产品名称')
+        elif not price or float(price) <= 0:
+            messages.error(request, '请输入有效的价格')
+        else:
+            product = Product.objects.create(
+                farmer=profile, name=name, category=category,
+                variety=variety, description=description,
+                price=price, unit=unit, status='pending'
+            )
+            messages.success(request, f'「{name}」已提交审核')
+            return redirect('farmer_products')
+    return render(request, 'farmer/product_form.html', {'action': '添加'})
+
+
+def farmer_product_edit(request, pk):
+    """农户编辑产品"""
+    profile = request.user.farmerprofile
+    product = get_object_or_404(Product, pk=pk, farmer=profile)
+    if product.status != 'draft':
+        messages.warning(request, '只能编辑草稿状态的产品')
+        return redirect('farmer_products')
+    if request.method == 'POST':
+        product.name = request.POST.get('name', product.name)
+        product.category = request.POST.get('category', '')
+        product.variety = request.POST.get('variety', '')
+        product.description = request.POST.get('description', '')
+        product.price = request.POST.get('price', product.price)
+        product.unit = request.POST.get('unit', 'kg')
+        if request.POST.get('submit') == 'submit':
+            product.status = 'pending'
+            messages.success(request, f'「{product.name}」已提交审核')
+        else:
+            messages.success(request, '草稿已保存')
+        product.save()
+        return redirect('farmer_products')
+    return render(request, 'farmer/product_form.html', {'product': product, 'action': '编辑'})
+
+
+def farmer_product_delete(request, pk):
+    """农户下架/删除产品"""
+    profile = request.user.farmerprofile
+    product = get_object_or_404(Product, pk=pk, farmer=profile)
+    product.delete()
+    messages.success(request, f'「{product.name}」已删除')
+    return redirect('farmer_products')
+
+
+def farmer_product_submit(request, pk):
+    """农户提交审核"""
+    profile = request.user.farmerprofile
+    product = get_object_or_404(Product, pk=pk, farmer=profile)
+    if product.status == 'draft':
+        product.status = 'pending'
+        product.save()
+        messages.success(request, f'「{product.name}」已提交审核')
+    return redirect('farmer_products')
+
+
+# ===== 管理端功能 =====
+
+def admin_required(view_func):
+    """装饰器：检查是否为管理员"""
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_staff:
+            messages.error(request, '无权限')
+            return redirect('/')
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+@admin_required
+def admin_dashboard(request):
+    """管理后台首页"""
+    products_pending = Product.objects.filter(status='pending').count()
+    products_total = Product.objects.count()
+    farmers_total = FarmerProfile.objects.count()
+    users_total = User.objects.count()
+    orders_total = Order.objects.count()
+    return render(request, 'admin/dashboard.html', {
+        'products_pending': products_pending,
+        'products_total': products_total,
+        'farmers_total': farmers_total,
+        'users_total': users_total,
+        'orders_total': orders_total,
+    })
+
+
+@admin_required
+def admin_products(request):
+    """管理端 — 产品审核"""
+    status_filter = request.GET.get('status', 'pending')
+    products = Product.objects.select_related('farmer__user', 'farmer__cooperative').all()
+    if status_filter != 'all':
+        products = products.filter(status=status_filter)
+    products = products.order_by('-created_at')
+    return render(request, 'admin/products.html', {
+        'products': products,
+        'current_status': status_filter,
+    })
+
+
+@admin_required
+def admin_product_review(request, pk, action):
+    """管理端 — 审核操作"""
+    product = get_object_or_404(Product, pk=pk)
+    if action == 'approve':
+        product.status = 'approved'
+        product.review_note = request.GET.get('note', '审核通过')
+        messages.success(request, f'「{product.name}」已通过审核')
+    elif action == 'reject':
+        note = request.GET.get('note', '')
+        product.status = 'rejected'
+        product.review_note = note
+        messages.warning(request, f'「{product.name}」未通过审核')
+    product.save()
+    return redirect('admin_products')
+
+
+@admin_required
+def admin_users(request):
+    """管理端 — 用户管理"""
+    users = User.objects.select_related('farmerprofile').all().order_by('-date_joined')
+    return render(request, 'admin/users.html', {'users': users})

@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+{% block title %}产品审核 - 智溯农链{% endblock %}
+{% block content %}
+<style>
+.admin-sidebar { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.admin-sidebar .nav-link { border-radius: 8px; padding: 10px 16px; color: #555; }
+.admin-sidebar .nav-link:hover { background: #e8f5e9; color: #2d8a4e; }
+.admin-sidebar .nav-link.active { background: #2d8a4e; color: #fff; }
+</style>
+<div class="container-fluid py-4">
+  <div class="row">
+    <div class="col-md-2 mb-3">
+      <div class="admin-sidebar">
+        <h6 class="fw-bold mb-3"><i class="bi bi-shield-lock text-danger"></i> 管理后台</h6>
+        <nav class="nav flex-column">
+          <a class="nav-link" href="{% url 'admin_dashboard' %}"><i class="bi bi-speedometer2"></i> 概览</a>
+          <a class="nav-link active" href="{% url 'admin_products' %}"><i class="bi bi-basket"></i> 产品审核</a>
+          <a class="nav-link" href="{% url 'admin_users' %}"><i class="bi bi-people"></i> 用户管理</a>
+          <a class="nav-link" href="/admin/" target="_blank"><i class="bi bi-gear"></i> Django Admin</a>
+        </nav>
+      </div>
+    </div>
+    <div class="col-md-10">
+      <h4 class="fw-bold mb-4"><i class="bi bi-basket text-danger"></i> 产品审核</h4>
+      <!-- 状态筛选 -->
+      <div class="btn-group mb-3">
+        <a href="?status=pending" class="btn btn-sm {% if current_status == 'pending' %}btn-warning{% else %}btn-outline-secondary{% endif %}">待审核</a>
+        <a href="?status=approved" class="btn btn-sm {% if current_status == 'approved' %}btn-success{% else %}btn-outline-secondary{% endif %}">已通过</a>
+        <a href="?status=rejected" class="btn btn-sm {% if current_status == 'rejected' %}btn-danger{% else %}btn-outline-secondary{% endif %}">未通过</a>
+        <a href="?status=all" class="btn btn-sm {% if current_status == 'all' %}btn-primary{% else %}btn-outline-secondary{% endif %}">全部</a>
+      </div>
+      <div class="card">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead><tr><th>产品</th><th>农户</th><th>价格</th><th>分类</th><th>状态</th><th>提交时间</th><th>操作</th></tr></thead>
+              <tbody>
+                {% for p in products %}
+                <tr>
+                  <td><strong>{{ p.name }}</strong></td>
+                  <td><small>{{ p.farmer.user.username }}</small></td>
+                  <td>¥{{ p.price }}</td>
+                  <td><small>{{ p.category|default:'-' }}</small></td>
+                  <td>
+                    {% if p.status == 'approved' %}<span class="badge bg-success">已上架</span>
+                    {% elif p.status == 'pending' %}<span class="badge bg-warning text-dark">待审核</span>
+                    {% elif p.status == 'rejected' %}<span class="badge bg-danger">未通过</span>
+                    {% else %}<span class="badge bg-secondary">草稿</span>{% endif %}
+                  </td>
+                  <td class="small">{{ p.created_at|date:'Y-m-d H:i' }}</td>
+                  <td>
+                    {% if p.status == 'pending' %}
+                      <a href="{% url 'admin_product_review' p.pk 'approve' %}" class="btn btn-sm btn-success" onclick="return confirm('通过「{{ p.name }}」的审核？')"><i class="bi bi-check-lg"></i> 通过</a>
+                      <button class="btn btn-sm btn-danger" onclick="rejectProduct({{ p.pk }}, '{{ p.name }}')"><i class="bi bi-x-lg"></i> 拒绝</button>
+                    {% else %}
+                      <span class="text-muted small">{{ p.review_note|default:'-' }}</span>
+                    {% endif %}
+                  </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="text-center py-4 text-muted">暂无产品</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function rejectProduct(pk, name) {
+  const note = prompt(`输入拒绝「${name}」的原因：`, '信息不完整，请补充');
+  if (note !== null) {
+    window.location.href = `/manage/products/${pk}/reject/?note=${encodeURIComponent(note)}`;
+  }
+}
+</script>
+{% endblock %}

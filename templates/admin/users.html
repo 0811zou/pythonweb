@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+{% block title %}用户管理 - 智溯农链{% endblock %}
+{% block content %}
+<style>
+.admin-sidebar { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.admin-sidebar .nav-link { border-radius: 8px; padding: 10px 16px; color: #555; }
+.admin-sidebar .nav-link:hover { background: #e8f5e9; color: #2d8a4e; }
+.admin-sidebar .nav-link.active { background: #2d8a4e; color: #fff; }
+</style>
+<div class="container-fluid py-4">
+  <div class="row">
+    <div class="col-md-2 mb-3">
+      <div class="admin-sidebar">
+        <h6 class="fw-bold mb-3"><i class="bi bi-shield-lock text-danger"></i> 管理后台</h6>
+        <nav class="nav flex-column">
+          <a class="nav-link" href="{% url 'admin_dashboard' %}"><i class="bi bi-speedometer2"></i> 概览</a>
+          <a class="nav-link" href="{% url 'admin_products' %}"><i class="bi bi-basket"></i> 产品审核</a>
+          <a class="nav-link active" href="{% url 'admin_users' %}"><i class="bi bi-people"></i> 用户管理</a>
+          <a class="nav-link" href="/admin/" target="_blank"><i class="bi bi-gear"></i> Django Admin</a>
+        </nav>
+      </div>
+    </div>
+    <div class="col-md-10">
+      <h4 class="fw-bold mb-4"><i class="bi bi-people text-danger"></i> 用户管理</h4>
+      <div class="card">
+        <div class="card-body p-0">
+          <div class="table-responsive">
+            <table class="table table-hover mb-0">
+              <thead><tr><th>ID</th><th>用户名</th><th>邮箱</th><th>角色</th><th>农户信息</th><th>注册时间</th><th>是否管理员</th></tr></thead>
+              <tbody>
+                {% for u in users %}
+                <tr>
+                  <td>{{ u.id }}</td>
+                  <td><strong>{{ u.username }}</strong></td>
+                  <td><small>{{ u.email|default:'-' }}</small></td>
+                  <td>
+                    {% if u.is_superuser %}<span class="badge bg-danger">超级管理员</span>
+                    {% elif u.is_staff %}<span class="badge bg-warning text-dark">管理员</span>
+                    {% elif u.farmerprofile %}<span class="badge bg-success">农户</span>
+                    {% else %}<span class="badge bg-info text-dark">消费者</span>{% endif %}
+                  </td>
+                  <td class="small">{% if u.farmerprofile %}{{ u.farmerprofile.phone|default:'-' }} / {{ u.farmerprofile.address|default:'-' }}{% else %}-{% endif %}</td>
+                  <td class="small">{{ u.date_joined|date:'Y-m-d' }}</td>
+                  <td><span class="badge bg-{% if u.is_staff %}success{% else %}secondary{% endif %}">{{ u.is_staff|yesno:'是,否' }}</span></td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="text-center py-4 text-muted">暂无用户</td></tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
