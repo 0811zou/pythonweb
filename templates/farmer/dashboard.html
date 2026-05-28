@@ -96,34 +96,3 @@
   </div>
 </div>
 {% endblock %}
-                <tr>
-                  <td><strong>{{ p.name }}</strong></td>
-                  <td>¥{{ p.price }}/{{ p.unit }}</td>
-                  <td>
-                    {% if p.status == 'approved' %}<span class="badge bg-success">已上架</span>
-                    {% elif p.status == 'pending' %}<span class="badge bg-warning text-dark">待审核</span>
-                    {% elif p.status == 'rejected' %}<span class="badge bg-danger">未通过</span>
-                    {% else %}<span class="badge bg-secondary">草稿</span>{% endif %}
-                  </td>
-                  <td class="small text-muted">{{ p.review_note|default:'-' }}</td>
-                  <td class="small">{{ p.created_at|date:'m-d' }}</td>
-                  <td>
-                    {% if p.status == 'draft' %}
-                      <a href="{% url 'farmer_product_edit' p.pk %}" class="btn btn-sm btn-outline-primary">编辑</a>
-                      <a href="{% url 'farmer_product_submit' p.pk %}" class="btn btn-sm btn-outline-success">提交</a>
-                    {% endif %}
-                    <a href="{% url 'farmer_product_delete' p.pk %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定删除？')">删除</a>
-                  </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="6" class="text-center py-4 text-muted">暂无产品，<a href="{% url 'farmer_product_create' %}">添加第一个产品</a></td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-{% endblock %}
