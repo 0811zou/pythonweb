@@ -62,9 +62,13 @@ function renderProducts(list) {
   grid.innerHTML = list.map(p => `
     <div class="col-lg-3 col-md-4 col-6">
       <div class="card h-100">
-        <div class="card-img-top d-flex align-items-center justify-content-center" style="background:#e8f5e9;font-size:3rem;color:#2d8a4e;">
-          <i class="bi bi-${p.category === '水果' ? 'apple' : p.category === '蔬菜' ? 'flower1' : p.category === '谷物' ? 'flower2' : 'basket'}"></i>
-        </div>
+        ${p.image ? `
+          <img src="${p.image}" class="card-img-top" style="height:180px;object-fit:cover;" alt="${p.name}">
+        ` : `
+          <div class="card-img-top d-flex align-items-center justify-content-center" style="height:180px;background:#e8f5e9;font-size:3rem;color:#2d8a4e;">
+            <i class="bi bi-${p.category === '水果' ? 'apple' : p.category === '蔬菜' ? 'flower1' : p.category === '谷物' ? 'flower2' : 'basket'}"></i>
+          </div>
+        `}
         <div class="card-body d-flex flex-column">
           <span class="badge-trace mb-1" style="align-self:flex-start;">${p.category || '农产品'}</span>
           <h5 class="card-title">${p.name}</h5>

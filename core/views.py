@@ -290,7 +290,7 @@ def farmer_products(request):
 
 def farmer_product_create(request):
     """农户添加产品"""
-    profile = request.user.farmerprofile
+    profile = request.farmer_profile
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         category = request.POST.get('category', '').strip()
@@ -308,6 +308,9 @@ def farmer_product_create(request):
                 variety=variety, description=description,
                 price=price, unit=unit, status='pending'
             )
+            if request.FILES.get('image'):
+                product.image = request.FILES['image']
+                product.save()
             messages.success(request, f'「{name}」已提交审核')
             return redirect('farmer_products')
     return render(request, 'farmer/product_form.html', {'action': '添加'})
@@ -315,10 +318,10 @@ def farmer_product_create(request):
 
 def farmer_product_edit(request, pk):
     """农户编辑产品"""
-    profile = request.user.farmerprofile
+    profile = request.farmer_profile
     product = get_object_or_404(Product, pk=pk, farmer=profile)
-    if product.status != 'draft':
-        messages.warning(request, '只能编辑草稿状态的产品')
+    if product.status not in ('draft', 'rejected'):
+        messages.warning(request, '只能编辑草稿或未通过审核的产品')
         return redirect('farmer_products')
     if request.method == 'POST':
         product.name = request.POST.get('name', product.name)
@@ -327,9 +330,12 @@ def farmer_product_edit(request, pk):
         product.description = request.POST.get('description', '')
         product.price = request.POST.get('price', product.price)
         product.unit = request.POST.get('unit', 'kg')
+        if request.FILES.get('image'):
+            product.image = request.FILES['image']
         if request.POST.get('submit') == 'submit':
             product.status = 'pending'
-            messages.success(request, f'「{product.name}」已提交审核')
+            product.review_note = ''
+            messages.success(request, f'「{product.name}」已重新提交审核')
         else:
             messages.success(request, '草稿已保存')
         product.save()

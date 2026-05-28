@@ -39,6 +39,7 @@ class Product(models.Model):
     description = models.TextField(blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
     unit = models.CharField(max_length=50, default='kg')
+    image = models.ImageField(upload_to='products/', blank=True, null=True, help_text='产品图片')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
     review_note = models.TextField(blank=True, help_text='审核意见')
     created_at = models.DateTimeField(auto_now_add=True)

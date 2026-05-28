@@ -1,12 +1,88 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}{{ product.name }} - 绿农溯源{% endblock %}
+{% block title %}{{ product.name }} - 智溯农链{% endblock %}
+
+{% block extra_head %}
+<style>
+.product-hero {
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+  border-radius: 20px;
+  min-height: 380px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+.product-hero .bg-circle {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(45,138,78,0.08);
+}
+.product-hero .bg-circle:nth-child(1) { width:200px;height:200px;top:-40px;right:-40px; }
+.product-hero .bg-circle:nth-child(2) { width:140px;height:140px;bottom:-30px;left:-30px; }
+.product-hero .bg-circle:nth-child(3) { width:80px;height:80px;bottom:40px;right:60px; }
+.product-hero img {
+  max-height: 320px;
+  max-width: 90%;
+  object-fit: contain;
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+  position: relative;
+  z-index: 1;
+}
+.product-hero .no-image {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+}
+.product-hero .no-image .icon { font-size: 5rem; color: #2d8a4e; opacity: 0.5; }
+.product-hero .no-image h3 { color: #2d8a4e; font-weight: 700; }
+.info-card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  height: 100%;
+}
+.price-tag {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+.price-tag small {
+  font-size: 0.9rem;
+  font-weight: 400;
+  color: #888;
+}
+.farmer-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #e8f5e9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: #2d8a4e;
+}
+.batch-item {
+  padding: 12px 16px;
+  border-left: 3px solid var(--primary);
+  background: #f9fdf9;
+  border-radius: 0 8px 8px 0;
+  margin-bottom: 8px;
+  transition: background 0.2s;
+}
+.batch-item:hover { background: #e8f5e9; }
+</style>
+{% endblock %}
 
 {% block content %}
 <section class="py-4">
   <div class="container">
-    <nav aria-label="breadcrumb">
+    <nav aria-label="breadcrumb" class="mb-3">
       <ol class="breadcrumb">
         <li class="breadcrumb-item"><a href="/">首页</a></li>
         <li class="breadcrumb-item"><a href="/products/">农产品</a></li>
@@ -15,39 +91,72 @@
     </nav>
 
     <div class="row g-4">
-      <!-- Gallery -->
+      <!-- 左侧：产品图片 -->
       <div class="col-lg-6">
-        <div class="product-gallery">
-          <div class="d-flex align-items-center justify-content-center" style="height:400px;background:#e8f5e9;border-radius:12px;font-size:6rem;color:#2d8a4e;">
-            <i class="bi bi-{{ product.category|lower|default:'basket' }}"></i>
-          </div>
+        <div class="product-hero">
+          <div class="bg-circle"></div>
+          <div class="bg-circle"></div>
+          <div class="bg-circle"></div>
+          {% if product.image %}
+            <img src="{{ product.image.url }}" alt="{{ product.name }}">
+          {% else %}
+            <div class="no-image">
+              <div class="icon">
+                <i class="bi bi-{% if '水果' in product.category %}apple{% elif '蔬菜' in product.category %}flower2{% elif '茶叶' in product.category %}cup-hot{% elif '粮油' in product.category %}droplet{% else %}basket{% endif %}"></i>
+              </div>
+              <h3>{{ product.name }}</h3>
+              <span class="badge bg-success bg-opacity-75 px-3 py-2 fs-6 mt-2">¥{{ product.price|floatformat:2 }} / {{ product.unit|default:'kg' }}</span>
+            </div>
+          {% endif %}
         </div>
       </div>
-      <!-- Info -->
+
+      <!-- 右侧：产品信息 -->
       <div class="col-lg-6">
-        <span class="badge-trace mb-2 d-inline-block">{{ product.category|default:'农产品' }}</span>
-        <h1 class="fw-bold mb-2">{{ product.name }}</h1>
-        {% if product.variety %}<p class="text-muted mb-3">品种：{{ product.variety }}</p>{% endif %}
-        <div class="mb-3">
-          <span class="price" style="font-size:2rem;">¥{{ product.price|floatformat:2 }}</span>
-          <small class="text-muted">/ {{ product.unit|default:'kg' }}</small>
-        </div>
-        <p class="mb-3">{{ product.description|default:'暂无描述' }}</p>
+        <div class="info-card">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <span class="badge-trace">{{ product.category|default:'农产品' }}</span>
+            {% if product.status == 'approved' %}
+              <span class="badge bg-success"><i class="bi bi-check-circle"></i> 已上架</span>
+            {% endif %}
+          </div>
+          <h1 class="fw-bold mb-1">{{ product.name }}</h1>
+          {% if product.variety %}
+            <p class="text-muted mb-3"><i class="bi bi-flower2"></i> {{ product.variety }}</p>
+          {% endif %}
 
-        <div class="d-flex gap-2 mb-4">
-          <a href="/trace/" class="btn btn-outline-primary"><i class="bi bi-qr-code-scan"></i> 扫码溯源</a>
-        </div>
+          <div class="price-tag mb-3">
+            ¥{{ product.price|floatformat:2 }}
+            <small>/ {{ product.unit|default:'kg' }}</small>
+          </div>
 
-        <div class="card p-3 mb-3">
-          <h6><i class="bi bi-person-circle text-success"></i> 农户信息</h6>
-          <p class="mb-1 small"><strong>{{ product.farmer_name|default:'农户' }}</strong></p>
-          <p class="mb-0 small text-muted">{{ product.farmer_address|default:'地址未填写' }}</p>
-        </div>
+          <p class="mb-4" style="line-height:1.8;color:#555;">
+            {{ product.description|default:'暂无描述' }}
+          </p>
 
-        <div class="card p-3">
-          <h6><i class="bi bi-boxes text-success"></i> 批次列表</h6>
-          <div id="batches-list">
-            <p class="small text-muted mb-0">加载中…</p>
+          <!-- 操作按钮 -->
+          <div class="d-flex gap-2 mb-4">
+            <a href="/trace/" class="btn btn-outline-primary"><i class="bi bi-qr-code-scan"></i> 扫码溯源</a>
+            <a href="/market/" class="btn btn-outline-success"><i class="bi bi-graph-up-arrow"></i> 市场分析</a>
+          </div>
+
+          <!-- 农户信息 -->
+          <div class="d-flex align-items-center gap-3 p-3 bg-light rounded-3 mb-3">
+            <div class="farmer-avatar"><i class="bi bi-person"></i></div>
+            <div>
+              <strong>{{ product.farmer_name|default:'农户' }}</strong>
+              <p class="mb-0 small text-muted">
+                <i class="bi bi-geo-alt"></i> {{ product.farmer_address|default:'地址未填写' }}
+              </p>
+            </div>
+          </div>
+
+          <!-- 批次列表 -->
+          <div>
+            <h6 class="fw-bold mb-2"><i class="bi bi-boxes text-success"></i> 产品批次</h6>
+            <div id="batches-list">
+              <p class="small text-muted mb-0"><i class="bi bi-arrow-repeat"></i> 加载中…</p>
+            </div>
           </div>
         </div>
       </div>
@@ -58,9 +167,7 @@
 
 {% block extra_scripts %}
 <script>
-// Load batches for this product
-const productId = {{ product.id }};
-fetch(`/api/batches/?product=${productId}`)
+fetch(`/api/batches/?product={{ product.id }}`)
   .then(r => r.json())
   .then(data => {
     const list = document.getElementById('batches-list');
@@ -68,13 +175,15 @@ fetch(`/api/batches/?product=${productId}`)
       list.innerHTML = '<p class="small text-muted mb-0">暂无批次记录</p>';
       return;
     }
-    list.innerHTML = '<div class="trace-timeline">' + data.map(b => `
-      <div class="trace-timeline-item">
-        <strong>批次 {{ b.batch_code }}</strong><br>
-        <span class="small text-muted">数量: ${b.quantity} | 收获: ${b.harvest_date || '未记录'}</span><br>
-        <a href="/trace/${b.batch_code}/" class="small">查看溯源 <i class="bi bi-arrow-right"></i></a>
+    list.innerHTML = data.map(b => `
+      <div class="batch-item d-flex justify-content-between align-items-center">
+        <div>
+          <strong class="small">#{{ b.batch_code|slice:':8' }}</strong>
+          <span class="small text-muted ms-2">数量: ${b.quantity}${b.harvest_date ? ' | 收获: ' + b.harvest_date : ''}</span>
+        </div>
+        <a href="/trace/${b.batch_code}/" class="btn btn-sm btn-outline-success"><i class="bi bi-search"></i> 溯源</a>
       </div>
-    `).join('') + '</div>';
+    `).join('');
   })
   .catch(() => {
     document.getElementById('batches-list').innerHTML = '<p class="small text-muted mb-0">加载失败</p>';
