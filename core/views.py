@@ -343,8 +343,9 @@ def farmer_products(request):
     return redirect('farmer_dashboard')
 
 
+@farmer_required
 def farmer_product_create(request):
-    """农户添加产品"""
+    """农户管理产品"""
     profile = request.farmer_profile
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
@@ -371,6 +372,7 @@ def farmer_product_create(request):
     return render(request, 'farmer/product_form.html', {'action': '添加'})
 
 
+@farmer_required
 def farmer_product_edit(request, pk):
     """农户编辑产品"""
     profile = request.farmer_profile
@@ -398,18 +400,20 @@ def farmer_product_edit(request, pk):
     return render(request, 'farmer/product_form.html', {'product': product, 'action': '编辑'})
 
 
+@farmer_required
 def farmer_product_delete(request, pk):
     """农户下架/删除产品"""
-    profile = request.user.farmerprofile
+    profile = request.farmer_profile
     product = get_object_or_404(Product, pk=pk, farmer=profile)
     product.delete()
     messages.success(request, f'「{product.name}」已删除')
     return redirect('farmer_products')
 
 
+@farmer_required
 def farmer_product_submit(request, pk):
     """农户提交审核"""
-    profile = request.user.farmerprofile
+    profile = request.farmer_profile
     product = get_object_or_404(Product, pk=pk, farmer=profile)
     if product.status == 'draft':
         product.status = 'pending'
