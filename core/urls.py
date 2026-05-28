@@ -5,6 +5,8 @@ from .views import (
     SubsidyViewSet, TrainingViewSet,
     trace_view, home_view, product_list_view, product_detail_view,
     trace_query_view, login_view, logout_view, register_view,
+    dashboard_stats, dashboard_view,
+    demand_analysis, market_analysis_view,
 )
 
 router = routers.DefaultRouter()
@@ -24,4 +26,8 @@ urlpatterns = [
     path('accounts/logout/', logout_view, name='logout'),
     path('accounts/register/', register_view, name='register'),
     path('api/', include(router.urls)),
+    path('api/stats/dashboard/', dashboard_stats, name='dashboard_stats'),
+    path('api/analysis/demand/', demand_analysis, name='demand_analysis'),
+    path('dashboard/', dashboard_view, name='dashboard'),
+    path('market/', market_analysis_view, name='market_analysis'),
 ]

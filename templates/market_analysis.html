@@ -1,0 +1,202 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}市场分析 - 智溯农链{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+.analysis-header {
+  background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+  border-radius: 16px; padding: 32px; margin-bottom: 24px;
+}
+.ai-insight-card {
+  background: linear-gradient(135deg, #fff8e1, #fff3e0);
+  border-left: 4px solid #ff9800;
+  border-radius: 12px; padding: 20px; margin-bottom: 20px;
+}
+.ai-insight-card .ai-icon { font-size: 2rem; color: #ff9800; }
+.stat-number { font-size: 2rem; font-weight: 700; color: var(--primary); }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-4">
+  <div class="container">
+    <!-- 标题 -->
+    <div class="analysis-header">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+          <div class="mb-2">
+            <span class="badge bg-primary me-2"><i class="bi bi-cpu"></i> 大模型分析</span>
+            <span class="badge bg-success">基于订单数据的智能供需分析</span>
+          </div>
+          <h2 class="fw-bold mb-1"><i class="bi bi-graph-up-arrow text-primary"></i> 农产品市场需求分析</h2>
+          <p class="text-muted mb-0">基于平台订单数据，AI 分析各农产品需求趋势与地区分布，指导农户精准销售</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- AI 智能洞察 -->
+    <div class="ai-insight-card" id="ai-insight-box">
+      <div class="d-flex gap-3 align-items-start">
+        <div class="ai-icon"><i class="bi bi-cpu"></i></div>
+        <div>
+          <h5 class="fw-bold mb-1">🤖 AI 市场简报</h5>
+          <p class="mb-0 text-muted" id="ai-summary">正在加载分析数据...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- 统计卡片 -->
+    <div class="row g-3 mb-4" id="analysis-metrics">
+      <div class="col-md-4">
+        <div class="card p-3 text-center h-100">
+          <div class="stat-number" id="ana-products">-</div>
+          <div class="text-muted">被分析产品种类</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card p-3 text-center h-100">
+          <div class="stat-number" id="ana-hot">-</div>
+          <div class="text-muted">当前最热门产品</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="card p-3 text-center h-100">
+          <div class="stat-number" id="ana-shortage">-</div>
+          <div class="text-muted">供不应求的产品数</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图表 -->
+    <div class="row g-3 mb-4">
+      <div class="col-lg-7">
+        <div class="card p-3 h-100">
+          <h5><i class="bi bi-bar-chart-fill text-success"></i> 各产品销量排行</h5>
+          <div id="chart-product-sales" style="height:320px;"></div>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="card p-3 h-100">
+          <h5><i class="bi bi-table text-primary"></i> 供需对比</h5>
+          <div id="chart-supply-demand" style="height:320px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 需求详情表格 -->
+    <div class="card p-3 mb-4">
+      <h5><i class="bi bi-list-check text-info"></i> 产品供需详情</h5>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0">
+          <thead>
+            <tr>
+              <th>产品</th>
+              <th>已销量</th>
+              <th>可用库存</th>
+              <th>供需状态</th>
+            </tr>
+          </thead>
+          <tbody id="demand-table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function initChart(id) {
+  const dom = document.getElementById(id);
+  if (!dom) return null;
+  const c = echarts.init(dom);
+  window.addEventListener('resize', () => c.resize());
+  return c;
+}
+
+fetch('/api/analysis/demand/')
+  .then(r => r.json())
+  .then(data => {
+    const summary = data.analysis_summary;
+
+    // 统计数字
+    document.getElementById('ana-products').textContent = summary.total_products_analyzed;
+    document.getElementById('ana-hot').textContent = summary.hot_product;
+    document.getElementById('ana-shortage').textContent = summary.shortage_products_count;
+
+    // AI 摘要
+    const aiBox = document.getElementById('ai-summary');
+    let aiText = `当前平台共分析 ${summary.total_products_analyzed} 种农产品。`;
+    aiText += `其中「${summary.hot_product}」销量最高，是当前最热门产品。`;
+    if (summary.shortage_products_count > 0) {
+      aiText += ` ⚠️ 有 ${summary.shortage_products_count} 种产品供不应求：${summary.shortage_products.slice(0,3).join('、')}。建议相关农户增加产量。`;
+    } else {
+      aiText += ` 目前供需基本平衡。`;
+    }
+    if (summary.regional_orders && summary.regional_orders.length > 0) {
+      aiText += ` 订单来源地区分布广泛，市场需求良好。`;
+    }
+    aiBox.textContent = aiText;
+
+    // 产品销量排行
+    const salesChart = initChart('chart-product-sales');
+    if (salesChart && data.regional_demand_top) {
+      const names = data.regional_demand_top.map(d => d.product);
+      const values = data.regional_demand_top.map(d => d.sold);
+      salesChart.setOption({
+        tooltip: { trigger: 'axis' },
+        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+        xAxis: { type: 'category', data: names, axisLabel: { rotate: 20 } },
+        yAxis: { type: 'value', name: '销量' },
+        series: [{
+          type: 'bar',
+          data: values.map(v => ({ value: v, itemStyle: { color: v > 0 ? '#2d8a4e' : '#ccc' } })),
+          barWidth: '50%',
+          label: { show: true, position: 'top' }
+        }]
+      });
+    }
+
+    // 供需对比
+    const sdChart = initChart('chart-supply-demand');
+    if (sdChart && data.product_supply_demand) {
+      const pnames = data.product_supply_demand.map(d => d.product);
+      sdChart.setOption({
+        tooltip: { trigger: 'axis' },
+        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+        xAxis: { type: 'category', data: pnames, axisLabel: { rotate: 20 } },
+        yAxis: { type: 'value', name: '数量' },
+        series: [
+          { name: '已售', type: 'bar', data: data.product_supply_demand.map(d => d.sold), itemStyle: { color: '#3498db' } },
+          { name: '可用', type: 'bar', data: data.product_supply_demand.map(d => d.available), itemStyle: { color: '#2ecc71' } }
+        ]
+      });
+    }
+
+    // 供需表格
+    const tbody = document.getElementById('demand-table-body');
+    if (tbody && data.product_supply_demand) {
+      data.product_supply_demand.forEach(d => {
+        const tr = document.createElement('tr');
+        let status = '<span class="badge bg-success">供需平衡</span>';
+        if (d.shortage > 0) status = `<span class="badge bg-danger">供不应求（缺${d.shortage}）</span>`;
+        else if (d.gap > d.sold) status = `<span class="badge bg-warning text-dark">供应过剩</span>`;
+        tr.innerHTML = `
+          <td><strong>${d.product}</strong></td>
+          <td>${d.sold}</td>
+          <td>${d.available}</td>
+          <td>${status}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+  })
+  .catch(err => {
+    console.error(err);
+    document.getElementById('ai-summary').textContent = '⚠️ 暂无足够订单数据生成分析，请先完成订单交易。';
+  });
+</script>
+{% endblock %}

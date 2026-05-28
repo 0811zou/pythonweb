@@ -1,0 +1,239 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}数据看板 - 绿农溯源{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+.chart-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 12px rgba(0,0,0,0.06); height: 100%; }
+.chart-card h5 { font-size: 0.95rem; color: #666; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+.chart-box { width: 100%; height: 320px; }
+.stat-card {
+  background: #fff; border-radius: 12px; padding: 24px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06); text-align: center;
+  transition: transform 0.2s;
+}
+.stat-card:hover { transform: translateY(-3px); }
+.stat-number { font-size: 2.2rem; font-weight: 700; color: var(--primary); }
+.stat-label { font-size: 0.9rem; color: #888; margin-top: 4px; }
+.dashboard-header {
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+  border-radius: 16px; padding: 32px; margin-bottom: 24px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="py-4">
+  <div class="container">
+    <!-- 标题 -->
+    <div class="dashboard-header">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+          <h2 class="fw-bold mb-1"><i class="bi bi-bar-chart-line text-success"></i> 数据驾驶舱</h2>
+          <p class="text-muted mb-0">绿农溯源平台运营数据总览</p>
+        </div>
+        <span class="badge bg-success fs-6 px-3 py-2"><i class="bi bi-arrow-repeat"></i> 实时数据</span>
+      </div>
+    </div>
+
+    <!-- 顶部统计卡片 -->
+    <div class="row g-3 mb-4" id="stats-cards">
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-number" id="dash-products">-</div>
+          <div class="stat-label"><i class="bi bi-basket text-success"></i> 农产品总数</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-number" id="dash-farmers">-</div>
+          <div class="stat-label"><i class="bi bi-people text-primary"></i> 入驻农户</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-number" id="dash-orders">-</div>
+          <div class="stat-label"><i class="bi bi-truck text-warning"></i> 已完成订单</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card">
+          <div class="stat-number" id="dash-coops">-</div>
+          <div class="stat-label"><i class="bi bi-building text-info"></i> 合作合作社</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 图表行 -->
+    <div class="row g-3 mb-4">
+      <!-- 月销量趋势 -->
+      <div class="col-lg-8">
+        <div class="chart-card">
+          <h5><i class="bi bi-graph-up-arrow text-success"></i> 月销量趋势（已完成订单）</h5>
+          <div class="chart-box" id="chart-sales-trend"></div>
+        </div>
+      </div>
+      <!-- 产品分类分布 -->
+      <div class="col-lg-4">
+        <div class="chart-card">
+          <h5><i class="bi bi-pie-chart text-primary"></i> 产品分类分布</h5>
+          <div class="chart-box" id="chart-category"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+      <!-- 订单状态分布 -->
+      <div class="col-md-6">
+        <div class="chart-card">
+          <h5><i class="bi bi-bar-chart text-warning"></i> 订单状态分布</h5>
+          <div class="chart-box" id="chart-order-status"></div>
+        </div>
+      </div>
+      <!-- 最新订单 -->
+      <div class="col-md-6">
+        <div class="chart-card">
+          <h5><i class="bi bi-list-check text-info"></i> 最新订单</h5>
+          <div class="table-responsive" style="max-height: 320px; overflow-y: auto;">
+            <table class="table table-sm table-hover mb-0" id="recent-orders-table">
+              <thead><tr><th>ID</th><th>买家</th><th>金额</th><th>状态</th><th>时间</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// 初始化 ECharts 图表的函数
+function initChart(domId) {
+  const dom = document.getElementById(domId);
+  if (!dom) return null;
+  const chart = echarts.init(dom);
+  // 自适应
+  window.addEventListener('resize', () => chart.resize());
+  return chart;
+}
+
+// 加载数据
+fetch('/api/stats/dashboard/')
+  .then(r => r.json())
+  .then(data => {
+    // 1. 统计数字
+    document.getElementById('dash-products').textContent = data.total_products;
+    document.getElementById('dash-farmers').textContent = data.total_farmers;
+    document.getElementById('dash-orders').textContent = data.total_orders;
+    document.getElementById('dash-coops').textContent = data.total_coops;
+
+    // 2. 月销量趋势
+    const salesChart = initChart('chart-sales-trend');
+    if (salesChart) {
+      salesChart.setOption({
+        tooltip: { trigger: 'axis' },
+        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+        xAxis: {
+          type: 'category',
+          data: data.monthly_sales.map(s => s.month),
+          axisLabel: { rotate: data.monthly_sales.length > 6 ? 30 : 0 }
+        },
+        yAxis: [
+          { type: 'value', name: '销售额 (元)' },
+          { type: 'value', name: '订单数' }
+        ],
+        series: [
+          {
+            name: '销售额',
+            type: 'bar',
+            data: data.monthly_sales.map(s => s.total),
+            itemStyle: { color: '#2d8a4e' }
+          },
+          {
+            name: '订单数',
+            type: 'line',
+            yAxisIndex: 1,
+            data: data.monthly_sales.map(s => s.count),
+            itemStyle: { color: '#f39c12' }
+          }
+        ]
+      });
+    }
+
+    // 3. 产品分类分布
+    const catChart = initChart('chart-category');
+    if (catChart) {
+      catChart.setOption({
+        tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
+        series: [{
+          type: 'pie',
+          radius: ['30%', '60%'],
+          center: ['50%', '50%'],
+          data: data.category_distribution.map(c => ({
+            name: c.category,
+            value: c.count
+          })),
+          label: { show: true, formatter: '{b}\n{d}%' },
+          emphasis: {
+            itemStyle: { shadowBlur: 10, shadowOffsetX: 0 }
+          }
+        }]
+      });
+    }
+
+    // 4. 订单状态分布
+    const statusMap = {
+      'pending': '待付款', 'paid_offline': '已付款(待确认)',
+      'confirmed': '已确认', 'shipped': '已发货',
+      'delivered': '已完成', 'cancelled': '已取消'
+    };
+    const statusColors = {
+      'pending': '#f39c12', 'paid_offline': '#3498db',
+      'confirmed': '#2ecc71', 'shipped': '#9b59b6',
+      'delivered': '#27ae60', 'cancelled': '#e74c3c'
+    };
+    const statusChart = initChart('chart-order-status');
+    if (statusChart) {
+      const statusData = Object.entries(data.order_status).map(([k, v]) => ({
+        name: statusMap[k] || k,
+        value: v,
+        itemStyle: { color: statusColors[k] || '#95a5a6' }
+      }));
+      statusChart.setOption({
+        tooltip: { trigger: 'axis' },
+        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+        xAxis: { type: 'category', data: statusData.map(s => s.name) },
+        yAxis: { type: 'value' },
+        series: [{
+          type: 'bar', data: statusData,
+          barWidth: '50%',
+          label: { show: true, position: 'top' }
+        }]
+      });
+    }
+
+    // 5. 最新订单
+    const tbody = document.querySelector('#recent-orders-table tbody');
+    if (tbody && data.recent_orders) {
+      data.recent_orders.forEach(o => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>#${o.id}</td>
+          <td>${o.buyer || '用户'}</td>
+          <td>¥${parseFloat(o.total_amount || 0).toFixed(2)}</td>
+          <td><span class="badge bg-${statusColors[o.status] ? 'success' : 'secondary'}">${statusMap[o.status] || o.status}</span></td>
+          <td class="small">${o.created_at ? o.created_at.substring(0,10) : ''}</td>`;
+        tbody.appendChild(tr);
+      });
+    }
+  })
+  .catch(err => {
+    console.error('数据加载失败:', err);
+    document.querySelectorAll('.stat-number').forEach(el => el.textContent = '!');
+  });
+</script>
+{% endblock %}
