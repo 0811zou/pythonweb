@@ -1,7 +1,7 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
-from django.shortcuts import get_object_or_404, render, redirect
+from django.shortcuts import get_object_or_404, render, redirect, reverse
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
@@ -82,8 +82,17 @@ def login_view(request):
             user = form.get_user()
             login(request, user)
             messages.success(request, f'欢迎回来，{user.username}！')
-            next_url = request.GET.get('next', '/')
-            return redirect(next_url)
+            next_url = request.GET.get('next', '')
+            if next_url:
+                return redirect(next_url)
+            # 根据角色跳转
+            if user.is_staff:
+                return redirect('admin_dashboard')
+            try:
+                user.farmerprofile
+                return redirect('farmer_dashboard')
+            except:
+                return redirect('product_list')
     else:
         form = AuthenticationForm()
     return render(request, 'login.html', {'form': form})
@@ -98,11 +107,17 @@ def register_view(request):
         return redirect('/')
     if request.method == 'POST':
         form = UserCreationForm(request.POST)
+        role = request.POST.get('role', 'consumer')
         if form.is_valid():
             user = form.save()
+            # 如果选择农户身份，自动创建农户档案
+            if role == 'farmer':
+                FarmerProfile.objects.create(user=user, phone='', address='')
             login(request, user)
             messages.success(request, f'注册成功，欢迎 {user.username}！')
-            return redirect('/')
+            if role == 'farmer':
+                return redirect('farmer_dashboard')
+            return redirect('product_list')
     else:
         form = UserCreationForm()
     return render(request, 'register.html', {'form': form})
@@ -236,6 +251,45 @@ def demand_analysis(request):
         ],
         'analysis_summary': analysis_summary,
     })
+
+
+# ===== 消费者下单 =====
+
+def order_create_view(request):
+    """消费者下单页面"""
+    if not request.user.is_authenticated:
+        return redirect(f"{reverse('login')}?next={request.path}")
+    # 农户不能给自己下单
+    try:
+        request.user.farmerprofile
+        messages.warning(request, '农户账号无法下单')
+        return redirect('farmer_dashboard')
+    except:
+        pass
+
+    product_id = request.GET.get('product') or request.POST.get('product_id')
+    product = get_object_or_404(Product, pk=product_id, status='approved')
+
+    if request.method == 'POST':
+        quantity = int(request.POST.get('quantity', 1))
+        address = request.POST.get('address', '').strip()
+        if not address:
+            return render(request, 'order_create.html', {'product': product, 'error': '请填写收货地址'})
+        total = float(product.price) * quantity
+        order = Order.objects.create(
+            buyer=request.user,
+            total_amount=total,
+            status='pending',
+            address=address,
+        )
+        # 找一个可用批次
+        batch = ProductBatch.objects.filter(product=product).first()
+        if batch:
+            OrderItem.objects.create(order=order, product_batch=batch, quantity=quantity, price=product.price)
+        messages.success(request, f'下单成功！订单编号 #{order.id}')
+        return redirect('product_detail', pk=product.id)
+
+    return render(request, 'order_create.html', {'product': product})
 
 
 def market_analysis_view(request):

@@ -10,6 +10,7 @@ from .views import (
     farmer_dashboard, farmer_products, farmer_product_create,
     farmer_product_edit, farmer_product_delete, farmer_product_submit,
     admin_dashboard, admin_products, admin_product_review, admin_users,
+    order_create_view,
 )
 
 router = routers.DefaultRouter()
@@ -32,6 +33,8 @@ urlpatterns = [
     path('api/stats/dashboard/', dashboard_stats, name='dashboard_stats'),
     path('api/analysis/demand/', demand_analysis, name='demand_analysis'),
     path('dashboard/', dashboard_view, name='dashboard'),
+    # 消费者端
+    path('order/create/', order_create_view, name='order_create'),
     path('market/', market_analysis_view, name='market_analysis'),
     # 农户端
     path('farmer/', farmer_dashboard, name='farmer_dashboard'),

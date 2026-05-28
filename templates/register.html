@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}注册 - 绿农溯源{% endblock %}
+{% block title %}注册 - 智溯农链{% endblock %}
 
 {% block content %}
 <div class="container">
@@ -15,7 +15,6 @@
       <div class="mb-3">
         <label class="form-label">用户名</label>
         <input type="text" name="username" class="form-control" placeholder="输入用户名" required maxlength="150">
-        <div class="form-text small">必填。150个字符以内。仅包含字母、数字和 @/./+/-/_ 。</div>
       </div>
       <div class="mb-3">
         <label class="form-label">邮箱</label>
@@ -28,6 +27,23 @@
       <div class="mb-3">
         <label class="form-label">确认密码</label>
         <input type="password" name="password2" class="form-control" placeholder="再次输入密码" required>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">注册身份 <span class="text-danger">*</span></label>
+        <div class="d-flex gap-3">
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="role" id="role-consumer" value="consumer" checked>
+            <label class="form-check-label" for="role-consumer">
+              <i class="bi bi-person"></i> 消费者 <small class="text-muted">购买农产品</small>
+            </label>
+          </div>
+          <div class="form-check form-check-inline">
+            <input class="form-check-input" type="radio" name="role" id="role-farmer" value="farmer">
+            <label class="form-check-label" for="role-farmer">
+              <i class="bi bi-person-circle"></i> 农户 <small class="text-muted">销售农产品</small>
+            </label>
+          </div>
+        </div>
       </div>
       {% if form.errors %}
         <div class="alert alert-danger">

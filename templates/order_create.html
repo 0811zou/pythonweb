@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block title %}下单 - 智溯农链{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width: 640px;">
+  <div class="card">
+    <div class="card-header">
+      <h5 class="mb-0"><i class="bi bi-cart-plus text-success"></i> 确认订单</h5>
+    </div>
+    <div class="card-body">
+      {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+      {% endif %}
+      <form method="post">
+        {% csrf_token %}
+        <!-- 产品信息 -->
+        <div class="d-flex align-items-center gap-3 p-3 bg-light rounded-3 mb-3">
+          <div style="width:60px;height:60px;border-radius:8px;background:#e8f5e9;display:flex;align-items:center;justify-content:center;font-size:1.5rem;color:#2d8a4e;">
+            <i class="bi bi-basket"></i>
+          </div>
+          <div>
+            <h6 class="mb-1 fw-bold">{{ product.name }}</h6>
+            <span class="price">¥{{ product.price|floatformat:2 }}</span>
+            <small class="text-muted">/ {{ product.unit|default:'kg' }}</small>
+          </div>
+        </div>
+
+        <input type="hidden" name="product_id" value="{{ product.id }}">
+
+        <div class="mb-3">
+          <label class="form-label">购买数量 <span class="text-danger">*</span></label>
+          <div class="input-group">
+            <button class="btn btn-outline-secondary" type="button" onclick="qty(-1)">−</button>
+            <input type="number" name="quantity" id="qty-input" class="form-control text-center" value="1" min="1" max="99" required>
+            <button class="btn btn-outline-secondary" type="button" onclick="qty(1)">+</button>
+            <span class="input-group-text">{{ product.unit|default:'kg' }}</span>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">收货地址 <span class="text-danger">*</span></label>
+          <input type="text" name="address" class="form-control" placeholder="省/市/区/详细地址" required>
+        </div>
+
+        <div class="p-3 bg-light rounded-3 mb-3">
+          <div class="d-flex justify-content-between">
+            <span>商品金额</span>
+            <span id="subtotal">¥{{ product.price|floatformat:2 }}</span>
+          </div>
+          <div class="d-flex justify-content-between small text-muted">
+            <span>支付方式</span>
+            <span>线下支付（到货后付款）</span>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-success w-100 py-2"><i class="bi bi-check-lg"></i> 提交订单</button>
+        <a href="/products/{{ product.id }}/" class="btn btn-outline-secondary w-100 mt-2">取消</a>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+function qty(delta) {
+  const input = document.getElementById('qty-input');
+  let v = parseInt(input.value) + delta;
+  if (v < 1) v = 1;
+  if (v > 99) v = 99;
+  input.value = v;
+  const price = {{ product.price }};
+  document.getElementById('subtotal').textContent = '¥' + (price * v).toFixed(2);
+}
+</script>
+{% endblock %}
