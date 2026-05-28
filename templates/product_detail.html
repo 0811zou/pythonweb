@@ -149,9 +149,9 @@
           <div class="d-flex align-items-center gap-3 p-3 bg-light rounded-3 mb-3">
             <div class="farmer-avatar"><i class="bi bi-person"></i></div>
             <div>
-              <strong>{{ product.farmer_name|default:'农户' }}</strong>
+              <strong>{{ product.farmer.user.username|default:'农户' }}</strong>
               <p class="mb-0 small text-muted">
-                <i class="bi bi-geo-alt"></i> {{ product.farmer_address|default:'地址未填写' }}
+                <i class="bi bi-geo-alt"></i> {{ product.farmer.address|default:'地址未填写' }}
               </p>
             </div>
           </div>
@@ -183,7 +183,7 @@ fetch(`/api/batches/?product={{ product.id }}`)
     list.innerHTML = data.map(b => `
       <div class="batch-item d-flex justify-content-between align-items-center">
         <div>
-          <strong class="small">#{{ b.batch_code|slice:':8' }}</strong>
+          <strong class="small">#${b.batch_code.substring(0, 8)}</strong>
           <span class="small text-muted ms-2">数量: ${b.quantity}${b.harvest_date ? ' | 收获: ' + b.harvest_date : ''}</span>
         </div>
         <a href="/trace/${b.batch_code}/" class="btn btn-sm btn-outline-success"><i class="bi bi-search"></i> 溯源</a>

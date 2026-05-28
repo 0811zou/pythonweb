@@ -99,7 +99,8 @@ class AuthTests(TestCase):
             'username': 'authuser',
             'password': 'authpass123'
         })
-        self.assertRedirects(response, '/')
+        # 非农户用户登录后跳转到产品列表页
+        self.assertRedirects(response, '/products/')
 
     def test_login_failure(self):
         """测试登录失败"""
@@ -156,7 +157,7 @@ class PageViewTests(TestCase):
         """测试首页"""
         response = self.client.get(reverse('home'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, '绿农溯源')
+        self.assertContains(response, 'Django + DRF')
 
     def test_product_list_page(self):
         """测试产品列表页"""
@@ -193,7 +194,7 @@ class APITests(TestCase):
             phone='13700000000', address='API测试地址'
         )
         self.product = Product.objects.create(
-            farmer=self.farmer, name='API测试苹果', price='25.00', unit='kg'
+            farmer=self.farmer, name='API测试苹果', price='25.00', unit='kg', status='approved'
         )
 
     def test_product_list_api(self):
@@ -201,9 +202,14 @@ class APITests(TestCase):
         response = self.client.get('/api/products/')
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertIsInstance(data, list)
-        self.assertEqual(len(data), 1)
-        self.assertEqual(data[0]['name'], 'API测试苹果')
+        # DRF 分页格式：{ count, results }
+        if isinstance(data, dict):
+            results = data.get('results', data)
+        else:
+            results = data
+        self.assertIsInstance(results, list)
+        self.assertEqual(len(results), 1)
+        self.assertEqual(results[0]['name'], 'API测试苹果')
 
     def test_product_detail_api(self):
         """测试产品详情 API"""

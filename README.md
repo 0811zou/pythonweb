@@ -1,6 +1,6 @@
-# 智溯农链 —— 基于大模型分析的农产品溯源与智能供需匹配平台
+# 智溯农链 —— 基于 Django + DRF 的农产品溯源与智能供需匹配平台
 
-> 核心架构：Django 5.2 + Django REST Framework + ECharts + 大模型 API + Docker
+> 核心架构：Django 5.2 + DRF + ECharts + 大模型(Ollama) + Docker
 >
 > 消费者扫码追溯全链路，农户通过 AI 需求分析洞察市场，实现农产品精准产销对接。
 
@@ -8,7 +8,7 @@
 
 ## 📋 项目概述
 
-**智溯农链**是一个融合大模型分析与二维码溯源技术的农业 Web 平台。与普通溯源平台不同，本系统在提供"从田间到餐桌"全流程追溯的同时，利用订单数据 + 大模型 API 进行市场需求分析，为农户提供销售决策支持。
+**智溯农链**是一个基于 Django + DRF、融合大模型分析与二维码溯源技术的农业 Web 平台。与普通溯源平台不同，本系统在提供"从田间到餐桌"全流程追溯的同时，利用订单数据 + 大模型 API 进行市场需求分析，为农户提供销售决策支持。
 
 ### 核心技术特色
 
@@ -26,6 +26,7 @@
 | **后端框架** | Django 5.2 + DRF 3.17 | Python Web 框架 |
 | **API 文档** | drf-spectacular (Swagger/OpenAPI) | 自动生成 API 文档 |
 | **前端** | Bootstrap 5 + Bootstrap Icons | 响应式 UI |
+| **大模型（LLM）** | Ollama (qwen2.5:7b) | 本地运行，免费免联网 |
 | **数据库** | SQLite（开发）/ PostgreSQL（生产） | Django ORM |
 | **容器化** | Docker + docker compose | 一键部署 |
 | **静态文件** | WhiteNoise | 生产环境静态文件服务 |
@@ -67,6 +68,13 @@ Training（培训）
 ### 前置条件
 - Python 3.10+
 - pip / venv
+- （可选）[Ollama](https://ollama.com/download) — 本地大模型，用于 AI 市场分析
+  ```bash
+  # 安装 Ollama 后拉取模型（约 4GB）
+  ollama pull qwen2.5:7b
+  # Ollama 会自动在后台运行
+  ```
+  > 未安装 Ollama 时，系统会自动使用规则引擎生成分析报告，不影响其他功能。
 
 ### 安装步骤
 

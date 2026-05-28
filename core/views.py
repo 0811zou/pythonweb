@@ -10,11 +10,13 @@ from django.db.models import Count, Sum
 from django.db.models.functions import TruncMonth
 from .models import Product, ProductBatch, Order, OrderItem, SubsidyApplication, Training, FarmerProfile, Cooperative, Review
 from .serializers import ProductSerializer, ProductBatchSerializer, OrderSerializer, SubsidyApplicationSerializer, TrainingSerializer
+from .llm_service import generate_analysis
 
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.select_related('farmer').filter(status='approved')
     serializer_class = ProductSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    ordering = ['-created_at']
 
 class ProductBatchViewSet(viewsets.ModelViewSet):
     queryset = ProductBatch.objects.select_related('product').all()
@@ -227,29 +229,25 @@ def demand_analysis(request):
         .order_by('-order_count')[:8]
     )
 
-    # 4. AI 分析简报（基于数据生成描述）
-    total_products_analyzed = len(product_supply_demand)
-    hot_product = product_supply_demand[0]['product'] if product_supply_demand else '暂无'
-    shortage_products = [p for p in product_supply_demand if p['shortage'] > 0]
-
-    analysis_summary = {
-        'total_products_analyzed': total_products_analyzed,
-        'hot_product': hot_product,
-        'shortage_products_count': len(shortage_products),
-        'shortage_products': [p['product'] for p in shortage_products[:5]],
-        'regional_orders': [
-            {'region': r['address'][:6], 'orders': r['order_count'], 'total': float(r['total'] or 0)}
-            for r in region_stats
-        ],
-    }
-
-    return Response({
+    # 4. AI 分析简报（优先调本地 Ollama 大模型，不可用时回退规则引擎）
+    llm_input = {
         'product_supply_demand': product_supply_demand,
         'regional_demand_top': [
             {'product': r['product_batch__product__name'], 'sold': r['total_qty'], 'revenue': float(r['total_revenue'] or 0)}
             for r in regional_demand
         ],
-        'analysis_summary': analysis_summary,
+        'region_stats': [
+            {'region': r['address'][:6], 'orders': r['order_count'], 'total': float(r['total'] or 0)}
+            for r in region_stats
+        ],
+    }
+
+    analysis_result = generate_analysis(llm_input)
+
+    return Response({
+        'product_supply_demand': product_supply_demand,
+        'regional_demand_top': llm_input['regional_demand_top'],
+        'analysis_summary': analysis_result,
     })
 
 
@@ -313,22 +311,11 @@ def farmer_required(view_func):
     return wrapper
 
 
-def farmer_dashboard(request):
-    """农户工作台"""
-    profile = request.user.farmerprofile
-    products = Product.objects.filter(farmer=profile).order_by('-created_at')
 @farmer_required
 def farmer_dashboard(request):
     """农户工作台"""
     profile = request.farmer_profile
     products = Product.objects.filter(farmer=profile).order_by('-created_at')
-    stats = {
-        'total': products.count(),
-        'approved': products.filter(status='approved').count(),
-        'pending': products.filter(status='pending').count(),
-        'draft': products.filter(status='draft').count(),
-    }
-    return render(request, 'farmer/dashboard.html', {'products': products, 'stats': stats})
     stats = {
         'total': products.count(),
         'approved': products.filter(status='approved').count(),

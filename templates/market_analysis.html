@@ -128,19 +128,29 @@ fetch('/api/analysis/demand/')
     document.getElementById('ana-hot').textContent = summary.hot_product;
     document.getElementById('ana-shortage').textContent = summary.shortage_products_count;
 
-    // AI 摘要
+    // AI 摘要 — 优先显示大模型生成的文本
     const aiBox = document.getElementById('ai-summary');
-    let aiText = `当前平台共分析 ${summary.total_products_analyzed} 种农产品。`;
-    aiText += `其中「${summary.hot_product}」销量最高，是当前最热门产品。`;
-    if (summary.shortage_products_count > 0) {
-      aiText += ` ⚠️ 有 ${summary.shortage_products_count} 种产品供不应求：${summary.shortage_products.slice(0,3).join('、')}。建议相关农户增加产量。`;
+    if (summary.summary_text) {
+      aiBox.textContent = summary.summary_text;
+      // 显示 AI 模型来源标签
+      const badge = document.createElement('small');
+      badge.className = 'badge bg-secondary ms-2';
+      badge.textContent = summary.ai_model || 'AI';
+      aiBox.parentNode.appendChild(badge);
     } else {
-      aiText += ` 目前供需基本平衡。`;
+      // 保底：模板生成
+      let aiText = `当前平台共分析 ${summary.total_products_analyzed} 种农产品。`;
+      aiText += `其中「${summary.hot_product}」销量最高，是当前最热门产品。`;
+      if (summary.shortage_products_count > 0) {
+        aiText += ` ⚠️ 有 ${summary.shortage_products_count} 种产品供不应求：${summary.shortage_products.slice(0,3).join('、')}。建议相关农户增加产量。`;
+      } else {
+        aiText += ` 目前供需基本平衡。`;
+      }
+      if (summary.regional_orders && summary.regional_orders.length > 0) {
+        aiText += ` 订单来源地区分布广泛，市场需求良好。`;
+      }
+      aiBox.textContent = aiText;
     }
-    if (summary.regional_orders && summary.regional_orders.length > 0) {
-      aiText += ` 订单来源地区分布广泛，市场需求良好。`;
-    }
-    aiBox.textContent = aiText;
 
     // 产品销量排行
     const salesChart = initChart('chart-product-sales');
