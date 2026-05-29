@@ -33,22 +33,33 @@
 <!-- Stats -->
 <section class="py-4" style="background: var(--white); border-bottom: 1px solid #f0f0f0;">
   <div class="container">
-    <div class="row" id="stats-row">
-      <div class="col-4 col-md-3"><div class="stat-item"><div class="number" id="stat-products">-</div><div class="label">农产品</div></div></div>
-      <div class="col-4 col-md-3"><div class="stat-item"><div class="number" id="stat-farmers">-</div><div class="label">入驻农户</div></div></div>
-      <div class="col-4 col-md-3"><div class="stat-item"><div class="number" id="stat-orders">-</div><div class="label">完成订单</div></div></div>
-      <div class="col-4 col-md-3 d-md-block d-none"><div class="stat-item"><div class="number" id="stat-coops">-</div><div class="label">合作合作社</div></div></div>
+    <div class="row g-2" id="stats-row">
+      <div class="col-3"><div class="stat-item"><div class="number" id="stat-products">-</div><div class="label">农产品</div></div></div>
+      <div class="col-3"><div class="stat-item"><div class="number" id="stat-farmers">-</div><div class="label">入驻农户</div></div></div>
+      <div class="col-3"><div class="stat-item"><div class="number" id="stat-orders">-</div><div class="label">完成订单</div></div></div>
+      <div class="col-3"><div class="stat-item"><div class="number" id="stat-coops">-</div><div class="label">合作合作社</div></div></div>
     </div>
   </div>
 </section>
 
-<!-- Featured Products -->
+<!-- 畅销产品 -->
 <section class="py-5">
   <div class="container">
-    <h2 class="section-title text-center">🌾 精选农产品</h2>
-    <p class="section-subtitle text-center">每一份产品都可追溯产地全流程</p>
-    <div class="row g-4" id="product-grid">
-      <!-- Rendered by JS -->
+    <h2 class="section-title text-center">畅销产品</h2>
+    <p class="section-subtitle text-center">平台最受欢迎的农产品，品质有保障</p>
+    <div class="row g-4" id="hot-products-grid">
+      <div class="col-12 text-center py-4"><div class="spinner-border text-success" role="status"></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 新品上架 -->
+<section class="py-5" style="background: var(--white);">
+  <div class="container">
+    <h2 class="section-title text-center">新品上架</h2>
+    <p class="section-subtitle text-center">最新入驻平台的产品，尝鲜正当时</p>
+    <div class="row g-4" id="new-products-grid">
+      <div class="col-12 text-center py-4"><div class="spinner-border text-success" role="status"></div></div>
     </div>
     <div class="text-center mt-4">
       <a href="/products/" class="btn btn-outline-primary">查看全部 <i class="bi bi-arrow-right"></i></a>
@@ -56,7 +67,24 @@
   </div>
 </section>
 
-<!-- Features -->
+<!-- 助农专区 -->
+<section class="py-5" style="background: linear-gradient(135deg, #fff8e1, #fff3e0);">
+  <div class="container">
+    <div class="d-flex align-items-center gap-3 mb-1">
+      <span style="font-size:2rem;">🌱</span>
+      <div>
+        <h2 class="section-title mb-0">帮扶助农</h2>
+        <p class="text-muted mb-0">您的每一次购买，都是对辛勤农户的一份支持</p>
+      </div>
+    </div>
+    <p class="section-subtitle" style="margin-left: 3.5rem;">这些产品质优价廉，值得您品尝</p>
+    <div class="row g-4" id="help-products-grid">
+      <div class="col-12 text-center py-4"><div class="spinner-border text-success" role="status"></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 为什么选择 -->
 <section class="py-5" style="background: var(--white);">
   <div class="container">
     <h2 class="section-title text-center">为什么选择智溯农链？</h2>
@@ -110,50 +138,132 @@
 
 {% block extra_scripts %}
 <script>
-// 从统一统计 API 加载数据
-fetch('/api/stats/dashboard/')
-  .then(r => r.json())
-  .then(data => {
-    // 统计数字
-    document.getElementById('stat-products').textContent = data.total_products;
-    document.getElementById('stat-farmers').textContent = data.total_farmers;
-    document.getElementById('stat-orders').textContent = data.total_orders;
-    document.getElementById('stat-coops').textContent = data.total_coops;
+// 分类图标映射
+const catIcon = {
+  '水果': 'apple', '蔬菜': 'flower1', '茶叶': 'cup-hot',
+  '粮油': 'droplet', '干货': 'basket', '畜禽': 'egg'
+};
+const catColors = {
+  '水果': '#ff6b6b', '蔬菜': '#51cf66', '茶叶': '#845ef7',
+  '粮油': '#fcc419', '干货': '#e8590c', '畜禽': '#339af0'
+};
 
-    // 精选农产品（取前8个）
-    const grid = document.getElementById('product-grid');
-    fetch('/api/products/')
-      .then(r => r.json())
-      .then(prods => {
-        if (Array.isArray(prods)) {
-          prods.slice(0, 8).forEach(p => {
-            const col = document.createElement('div');
-            col.className = 'col-lg-3 col-md-4 col-6';
-            col.innerHTML = `
-              <div class="card h-100">
-                <div class="card-img-top d-flex align-items-center justify-content-center" style="background:#e8f5e9;font-size:3rem;color:#2d8a4e;">
-                  <i class="bi bi-basket"></i>
-                </div>
-                <div class="card-body d-flex flex-column">
-                  <h5 class="card-title">${p.name}</h5>
-                  <p class="card-text small flex-grow-1">${p.description ? p.description.substring(0,60) : '来自优质产地的健康农产品'}</p>
-                  <div class="d-flex justify-content-between align-items-center mt-auto">
-                    <span class="price">¥${parseFloat(p.price).toFixed(2)} <small>/ ${p.unit||'kg'}</small></span>
-                    <a href="/products/${p.id}/" class="btn btn-sm btn-outline-primary">详情</a>
-                  </div>
-                </div>
-              </div>`;
-            grid.appendChild(col);
-          });
-        }
-      });
-  })
-  .catch(() => {
-    // fallback: 从产品 API 单独加载
-    document.getElementById('stat-products').textContent = '?';
-    document.getElementById('stat-farmers').textContent = '?';
-    document.getElementById('stat-orders').textContent = '?';
-    document.getElementById('stat-coops').textContent = '?';
+function productCard(p, badge, statusLine) {
+  const icon = catIcon[p.category] || 'basket';
+  const color = catColors[p.category] || '#2d8a4e';
+  return `
+    <div class="col-lg-3 col-md-4 col-6">
+      <div class="card h-100 position-relative">
+        ${badge ? `<span class="position-absolute top-0 start-0 badge bg-${badge.bg} m-2">${badge.text}</span>` : ''}
+        ${p.image ? `
+          <img src="${p.image}" class="card-img-top" style="height:160px;object-fit:cover;" alt="${p.name}">
+        ` : `
+          <div class="card-img-top d-flex align-items-center justify-content-center" style="height:140px;background:${color}15;font-size:2.8rem;color:${color};">
+            <i class="bi bi-${icon}"></i>
+          </div>
+        `}
+        <div class="card-body d-flex flex-column">
+          <span class="badge-trace mb-1" style="align-self:flex-start;background:${color}20;color:${color};">${p.category || '农产品'}</span>
+          <h5 class="card-title">${p.name}</h5>
+          <p class="card-text small flex-grow-1">${p.description ? p.description.substring(0,60) : '来自优质产地的健康农产品'}</p>
+          ${statusLine ? `<p class="small mb-1">${statusLine}</p>` : ''}
+          <div class="d-flex justify-content-between align-items-center mt-auto">
+            <span class="price" style="color:${color};">¥${parseFloat(p.price).toFixed(2)} <small>/ ${p.unit||'kg'}</small></span>
+            <a href="/products/${p.id}/" class="btn btn-sm" style="border-color:${color};color:${color};">详情</a>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+// 加载统计
+fetch('/api/stats/dashboard/').then(r=>r.json()).then(d => {
+  document.getElementById('stat-products').textContent = d.total_products;
+  document.getElementById('stat-farmers').textContent = d.total_farmers;
+  document.getElementById('stat-orders').textContent = d.total_orders;
+  document.getElementById('stat-coops').textContent = d.total_coops || '-';
+}).catch(() => {
+  document.querySelectorAll('.stat-item .number').forEach(el => el.textContent = '?');
+});
+
+// 加载所有产品和市场分析数据
+Promise.all([
+  fetch('/api/products/').then(r => r.json()),
+  fetch('/api/analysis/demand/').then(r => r.json()).catch(() => null),
+]).then(([prodsData, demandData]) => {
+  const products = prodsData.results || prodsData || [];
+  if (!products.length) return;
+
+  // 建立 名称->产品 映射
+  const nameMap = {};
+  products.forEach(p => { nameMap[p.name] = p; });
+
+  // 畅销产品
+  if (demandData && demandData.regional_demand_top) {
+    const hotList = demandData.regional_demand_top.slice(0, 4);
+    const hotGrid = document.getElementById('hot-products-grid');
+    hotGrid.innerHTML = hotList.map(item => {
+      const p = nameMap[item.product];
+      if (!p) return '';
+      return productCard(p, { text: '热销', bg: 'danger' });
+    }).filter(Boolean).join('') || '<div class="col-12 text-center text-muted py-3">暂无数据</div>';
+  } else {
+    document.getElementById('hot-products-grid').innerHTML = products.slice(0, 4).map(p =>
+      productCard(p, { text: '热销', bg: 'danger' })
+    ).join('');
+  }
+
+  // 新品上架
+  document.getElementById('new-products-grid').innerHTML = products.slice(0, 4).map(p =>
+    productCard(p, { text: '新品', bg: 'success' })
+  ).join('');
+
+  // 助农专区
+  function supplyStatus(d) {
+    const { sold, available, gap, shortage } = d;
+    if (sold === 0) return { text: '待售', cls: 'bg-info' };
+    if (shortage > 0) return { text: '缺货', cls: 'bg-danger' };
+    const r = gap / sold;
+    if (r <= 0.3) return { text: '供需平衡', cls: 'bg-success' };
+    if (r <= 1.0) return { text: '供应偏松', cls: 'bg-primary' };
+    return { text: '供应过剩', cls: 'bg-secondary' };
+  }
+
+  const helpGrid = document.getElementById('help-products-grid');
+  if (demandData && demandData.product_supply_demand) {
+    const helpCandidates = demandData.product_supply_demand
+      .filter(item => {
+        const p = nameMap[item.product];
+        return p && item.sold < item.available && item.gap > item.sold;
+      })
+      .sort((a, b) => b.gap - a.gap)
+      .slice(0, 4);
+
+    if (helpCandidates.length) {
+      helpGrid.innerHTML = helpCandidates.map(item => {
+        const p = nameMap[item.product];
+        if (!p) return '';
+        const st = supplyStatus(item);
+        return productCard(p, { text: '助农', bg: 'warning text-dark' },
+          `<span class="badge ${st.cls}">${st.text}</span> 库存${item.available}，已售${item.sold}`
+        );
+      }).join('');
+    } else {
+      const shuffled = [...products].sort(() => Math.random() - 0.5);
+      helpGrid.innerHTML = shuffled.slice(0, 4).map(p =>
+        productCard(p, { text: '助农', bg: 'warning text-dark' })
+      ).join('');
+    }
+  } else {
+    const shuffled = [...products].sort(() => Math.random() - 0.5);
+    helpGrid.innerHTML = shuffled.slice(0, 4).map(p =>
+      productCard(p, { text: '助农', bg: 'warning text-dark' })
+    ).join('');
+  }
+}).catch(() => {
+  ['hot-products-grid', 'new-products-grid', 'help-products-grid'].forEach(id => {
+    document.getElementById(id).innerHTML = '<div class="col-12 text-center py-4 text-muted">加载失败</div>';
   });
+});
 </script>
 {% endblock %}

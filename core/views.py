@@ -6,21 +6,84 @@ from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib import messages
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum, Q
 from django.db.models.functions import TruncMonth
 from .models import Product, ProductBatch, Order, OrderItem, SubsidyApplication, Training, FarmerProfile, Cooperative, Review
 from .serializers import ProductSerializer, ProductBatchSerializer, OrderSerializer, SubsidyApplicationSerializer, TrainingSerializer
 from .llm_service import generate_analysis
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.select_related('farmer').filter(status='approved')
+    queryset = Product.objects.select_related('farmer').prefetch_related('batches').filter(status='approved')
     serializer_class = ProductSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     ordering = ['-created_at']
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        category = self.request.query_params.get('category')
+        variety = self.request.query_params.get('variety')
+        origin = self.request.query_params.get('origin')
+        search = self.request.query_params.get('search')
+        if category:
+            qs = qs.filter(category=category)
+        if variety:
+            qs = qs.filter(variety=variety)
+        if origin:
+            qs = qs.filter(farmer__address__icontains=origin)
+        if search:
+            qs = qs.filter(Q(name__icontains=search) | Q(description__icontains=search))
+        return qs
+
+
+@api_view(['GET'])
+def product_filter_options(request):
+    """返回可用的筛选选项（分类、品种、产地）"""
+    categories = (
+        Product.objects.filter(status='approved')
+        .values('category')
+        .exclude(category='')
+        .annotate(count=Count('id'))
+        .order_by('-count')
+    )
+    # 品种按分类分组
+    varieties_qs = (
+        Product.objects.filter(status='approved')
+        .values('category', 'variety')
+        .exclude(variety='')
+        .annotate(count=Count('id'))
+        .order_by('-count')
+    )
+    varieties = {}
+    for v in varieties_qs:
+        cat = v['category'] or '其他'
+        if cat not in varieties:
+            varieties[cat] = []
+        varieties[cat].append(v['variety'])
+    # 产地（从农户地址中提取省份/地区）
+    origins = (
+        FarmerProfile.objects
+        .exclude(address='')
+        .values('address')
+        .annotate(count=Count('id'))
+        .order_by('-count')
+    )
+    return Response({
+        'categories': [c['category'] for c in categories],
+        'varieties': varieties,
+        'origins': [o['address'][:10] for o in origins if o['address']],
+    })
+
+
 class ProductBatchViewSet(viewsets.ModelViewSet):
     queryset = ProductBatch.objects.select_related('product').all()
     serializer_class = ProductBatchSerializer
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        product_id = self.request.query_params.get('product')
+        if product_id:
+            qs = qs.filter(product_id=product_id)
+        return qs
 
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.prefetch_related('items').all()
@@ -52,6 +115,7 @@ def trace_view(request, batch_code):
     batch = get_object_or_404(ProductBatch, batch_code=batch_code)
     return render(request, 'trace.html', {'batch': batch})
 
+
 # ===== 前端页面 =====
 def home_view(request):
     return render(request, 'index.html')
@@ -62,6 +126,13 @@ def product_list_view(request):
 def product_detail_view(request, pk):
     product = get_object_or_404(Product.objects.select_related('farmer__user', 'farmer__cooperative'), pk=pk)
     return render(request, 'product_detail.html', {'product': product})
+
+
+def product_batches_view(request, pk):
+    """产品批次列表页"""
+    product = get_object_or_404(Product.objects.select_related('farmer__user'), pk=pk)
+    batches = ProductBatch.objects.filter(product=product).order_by('-created_at')
+    return render(request, 'product_batches.html', {'product': product, 'batches': batches})
 
 def trace_query_view(request):
     """溯源查询页面 - 手动输入批次号"""
@@ -129,13 +200,15 @@ def register_view(request):
 
 @api_view(['GET'])
 def dashboard_stats(request):
-    """首页统计面板数据"""
+    """数据驾驶舱 — 根据角色返回不同数据"""
+    is_staff = request.user.is_authenticated and request.user.is_staff
+
+    # 基础数据（所有人可见）
     total_products = Product.objects.count()
     total_farmers = FarmerProfile.objects.count()
     total_orders = Order.objects.filter(status='delivered').count()
-    total_coops = Cooperative.objects.count()
 
-    # 月销量趋势（按月份统计已完成订单总额）
+    # 月销量趋势
     monthly_sales = (
         Order.objects.filter(status='delivered')
         .annotate(month=TruncMonth('created_at'))
@@ -151,23 +224,10 @@ def dashboard_stats(request):
         .order_by('-count')
     )
 
-    # 订单状态分布
-    order_status = (
-        Order.objects.values('status')
-        .annotate(count=Count('id'))
-    )
-
-    # 最新订单
-    recent_orders = OrderSerializer(
-        Order.objects.prefetch_related('items').order_by('-created_at')[:5],
-        many=True
-    ).data
-
-    return Response({
+    result = {
         'total_products': total_products,
         'total_farmers': total_farmers,
         'total_orders': total_orders,
-        'total_coops': total_coops,
         'monthly_sales': [
             {'month': s['month'].strftime('%Y-%m') if s['month'] else '未知', 'total': float(s['total'] or 0), 'count': s['count']}
             for s in monthly_sales
@@ -176,9 +236,24 @@ def dashboard_stats(request):
             {'category': c['category'] or '未分类', 'count': c['count']}
             for c in category_dist
         ],
-        'order_status': {s['status']: s['count'] for s in order_status},
-        'recent_orders': recent_orders,
-    })
+    }
+
+    # 管理员专属数据
+    if is_staff:
+        total_coops = Cooperative.objects.count()
+        order_status = (
+            Order.objects.values('status')
+            .annotate(count=Count('id'))
+        )
+        recent_orders = OrderSerializer(
+            Order.objects.prefetch_related('items').order_by('-created_at')[:10],
+            many=True
+        ).data
+        result['total_coops'] = total_coops
+        result['order_status'] = {s['status']: s['count'] for s in order_status}
+        result['recent_orders'] = recent_orders
+
+    return Response(result)
 
 
 def dashboard_view(request):
@@ -191,10 +266,10 @@ def dashboard_view(request):
 @api_view(['GET'])
 def demand_analysis(request):
     """需求分析 API — 分析产品卖往哪些地区、什么产品需求大"""
-    # 1. 各地区需求排行（基于订单收货地址）
+    # 1. 各地区需求排行（排除已取消订单，统计所有有效需求）
     regional_demand = (
         OrderItem.objects
-        .filter(order__status='delivered')
+        .exclude(order__status='cancelled')
         .values('product_batch__product__name')
         .annotate(
             total_qty=Sum('quantity'),
@@ -203,12 +278,11 @@ def demand_analysis(request):
         .order_by('-total_qty')[:10]
     )
 
-    # 2. 各产品供需情况
+    # 2. 各产品供需情况（遍历所有有批次的产品，含销量为0的）
+    sold_map = {item['product_batch__product__name']: item['total_qty'] for item in regional_demand}
     product_supply_demand = []
-    for item in regional_demand:
-        pname = item['product_batch__product__name']
-        sold = item['total_qty']
-        # 可用供应量（所有批次总量）
+    for pname in ProductBatch.objects.values_list('product__name', flat=True).distinct():
+        sold = sold_map.get(pname, 0)
         available = ProductBatch.objects.filter(
             product__name=pname
         ).aggregate(total=Sum('quantity'))['total'] or 0
@@ -219,11 +293,12 @@ def demand_analysis(request):
             'gap': available - sold if available > sold else 0,
             'shortage': sold - available if sold > available else 0,
         })
+    product_supply_demand.sort(key=lambda x: x['sold'], reverse=True)
 
-    # 3. 地区分布
+    # 3. 地区分布（排除已取消）
     region_stats = (
         Order.objects
-        .filter(status='delivered')
+        .exclude(status='cancelled')
         .values('address')
         .annotate(order_count=Count('id'), total=Sum('total_amount'))
         .order_by('-order_count')[:8]
@@ -291,8 +366,21 @@ def order_create_view(request):
 
 
 def market_analysis_view(request):
-    """市场分析页面"""
+    """市场分析页面 — 需登录"""
+    if not request.user.is_authenticated:
+        messages.info(request, '请先登录或注册后查看市场分析')
+        return redirect(f"{reverse('login')}?next={request.path}")
     return render(request, 'market_analysis.html')
+
+
+def consumer_orders_view(request):
+    """消费者订单列表"""
+    if not request.user.is_authenticated:
+        return redirect(f"{reverse('login')}?next={request.path}")
+    orders = Order.objects.filter(buyer=request.user).prefetch_related('items__product_batch__product').order_by('-created_at')
+    return render(request, 'consumer_orders.html', {'orders': orders})
+
+
 
 
 # ===== 农户端功能 =====
@@ -309,6 +397,18 @@ def farmer_required(view_func):
             return redirect('register')
         return view_func(request, *args, **kwargs)
     return wrapper
+
+
+
+
+@farmer_required
+def farmer_orders_view(request):
+    """农户查看自己产品的订单"""
+    profile = request.farmer_profile
+    orders = Order.objects.filter(
+        items__product_batch__product__farmer=profile
+    ).prefetch_related('items__product_batch__product', 'buyer').distinct().order_by('-created_at')
+    return render(request, 'farmer/orders.html', {'orders': orders})
 
 
 @farmer_required

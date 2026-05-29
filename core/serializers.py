@@ -13,7 +13,14 @@ class FarmerProfileSerializer(serializers.ModelSerializer):
         model = FarmerProfile
         fields = '__all__'
 
+class ProductBatchListSerializer(serializers.ModelSerializer):
+    """用于在产品详情中嵌套显示批次"""
+    class Meta:
+        model = ProductBatch
+        fields = ['id', 'batch_code', 'harvest_date', 'quantity', 'images', 'trace_info', 'qc_report', 'created_at']
+
 class ProductSerializer(serializers.ModelSerializer):
+    batches = ProductBatchListSerializer(many=True, read_only=True)
     class Meta:
         model = Product
         fields = '__all__'

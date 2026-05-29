@@ -116,7 +116,7 @@ def _build_fallback_summary(data: dict) -> dict:
         "hot_product": hot_product,
         "shortage_products_count": shortage_count,
         "shortage_products": shortage_names,
-        "ai_model": "规则引擎（Ollama 离线）",
+        "ai_model": "",
     }
 
 
@@ -147,6 +147,6 @@ def generate_analysis(data: dict) -> dict:
             "ai_model": f"Ollama ({OLLAMA_MODEL})",
         }
 
-    # 保底：规则引擎
-    fallback["ai_model"] = "规则引擎（Ollama 未运行）"
+    # 保底：规则引擎（不暴露技术细节）
+    fallback["ai_model"] = ""
     return fallback

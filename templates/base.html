@@ -28,7 +28,15 @@
           <li class="nav-item"><a class="nav-link {% if '/products' in request.path %}active{% endif %}" href="/products/"><i class="bi bi-basket"></i> 农产品</a></li>
           <li class="nav-item"><a class="nav-link {% if '/trace/' in request.path %}active{% endif %}" href="/trace/"><i class="bi bi-qr-code-scan"></i> 溯源查询</a></li>
           <li class="nav-item"><a class="nav-link {% if '/dashboard/' in request.path %}active{% endif %}" href="/dashboard/"><i class="bi bi-bar-chart"></i> 数据看板</a></li>
-          <li class="nav-item"><a class="nav-link {% if '/market/' in request.path %}active{% endif %}" href="/market/"><i class="bi bi-graph-up-arrow"></i> 市场分析</a></li>
+          {% if user.is_authenticated %}
+            {% if user.farmerprofile %}
+              <!-- 农户专享导航 -->
+              <li class="nav-item"><a class="nav-link {% if '/market/' in request.path %}active{% endif %}" href="/market/"><i class="bi bi-graph-up-arrow"></i> 市场分析</a></li>
+            {% else %}
+              <!-- 消费者专享导航 -->
+              <li class="nav-item"><a class="nav-link {% if '/orders/' in request.path %}active{% endif %}" href="/orders/"><i class="bi bi-receipt"></i> 我的订单</a></li>
+            {% endif %}
+          {% endif %}
         </ul>
         <div class="d-flex align-items-center gap-2">
           {% if user.is_authenticated %}

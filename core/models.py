@@ -1,6 +1,14 @@
 from django.db import models
 from django.contrib.auth.models import User
-import uuid
+import secrets
+from datetime import datetime
+
+
+def generate_batch_code():
+    """生成可读批次编号：B-20260529-A3F2X7K9"""
+    date_part = datetime.now().strftime('%Y%m%d')
+    rand_part = secrets.token_hex(4).upper()
+    return f'B-{date_part}-{rand_part}'
 
 class Cooperative(models.Model):
     name = models.CharField(max_length=200)
@@ -49,7 +57,7 @@ class Product(models.Model):
 
 class ProductBatch(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='batches')
-    batch_code = models.CharField(max_length=100, unique=True, default=uuid.uuid4)
+    batch_code = models.CharField(max_length=100, unique=True, default=generate_batch_code)
     harvest_date = models.DateField(null=True, blank=True)
     quantity = models.PositiveIntegerField(default=0)
     images = models.JSONField(default=list, blank=True)

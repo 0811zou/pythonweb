@@ -162,6 +162,10 @@
             <div id="batches-list">
               <p class="small text-muted mb-0"><i class="bi bi-arrow-repeat"></i> 加载中…</p>
             </div>
+            <div class="text-end mt-1">
+              <a href="/products/{{ product.id }}/batches/" class="small text-success"><i class="bi bi-boxes"></i> 查看全部批次</a>
+            </div>
+          </div>
           </div>
         </div>
       </div>
@@ -172,26 +176,53 @@
 
 {% block extra_scripts %}
 <script>
+const INITIAL_SHOW = 3;
+
 fetch(`/api/batches/?product={{ product.id }}`)
   .then(r => r.json())
   .then(data => {
     const list = document.getElementById('batches-list');
-    if (!Array.isArray(data) || data.length === 0) {
+    const items = Array.isArray(data) ? data : (data.results || []);
+    if (items.length === 0) {
       list.innerHTML = '<p class="small text-muted mb-0">暂无批次记录</p>';
       return;
     }
-    list.innerHTML = data.map(b => `
-      <div class="batch-item d-flex justify-content-between align-items-center">
-        <div>
-          <strong class="small">#${b.batch_code.substring(0, 8)}</strong>
-          <span class="small text-muted ms-2">数量: ${b.quantity}${b.harvest_date ? ' | 收获: ' + b.harvest_date : ''}</span>
-        </div>
-        <a href="/trace/${b.batch_code}/" class="btn btn-sm btn-outline-success"><i class="bi bi-search"></i> 溯源</a>
-      </div>
-    `).join('');
+    const showAll = items.length <= INITIAL_SHOW;
+    const visible = showAll ? items : items.slice(0, INITIAL_SHOW);
+    renderBatches(list, visible);
+
+    if (!showAll) {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'text-center mt-2';
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-sm btn-outline-success';
+      btn.innerHTML = `<i class="bi bi-chevron-down"></i> 展开全部 ${items.length} 个批次`;
+      let expanded = false;
+      btn.onclick = () => {
+        expanded = !expanded;
+        renderBatches(list, expanded ? items : visible);
+        btn.innerHTML = expanded
+          ? `<i class="bi bi-chevron-up"></i> 收起`
+          : `<i class="bi bi-chevron-down"></i> 展开全部 ${items.length} 个批次`;
+      };
+      wrapper.appendChild(btn);
+      list.parentNode.appendChild(wrapper);
+    }
   })
   .catch(() => {
     document.getElementById('batches-list').innerHTML = '<p class="small text-muted mb-0">加载失败</p>';
   });
+
+function renderBatches(container, batchList) {
+  container.innerHTML = batchList.map(b => `
+    <div class="batch-item d-flex justify-content-between align-items-center">
+      <div>
+        <strong class="small">#${b.batch_code.substring(0, 8)}</strong>
+        <span class="small text-muted ms-2">数量: ${b.quantity}${b.harvest_date ? ' | 收获: ' + b.harvest_date : ''}</span>
+      </div>
+      <a href="/trace/${b.batch_code}/" class="btn btn-sm btn-outline-success"><i class="bi bi-search"></i> 溯源</a>
+    </div>
+  `).join('');
+}
 </script>
 {% endblock %}

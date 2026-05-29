@@ -102,6 +102,14 @@
           <tbody id="demand-table-body"></tbody>
         </table>
       </div>
+      <div class="small text-muted mt-2">
+        <span class="badge bg-success me-1">供需平衡</span> 销量与库存匹配
+        <span class="badge bg-warning text-dark ms-2 me-1">供不应求</span> 需求大于供给
+        <span class="badge bg-danger ms-2 me-1">严重短缺</span> 缺口超过销量50%
+        <span class="badge bg-primary ms-2 me-1">供应偏松</span> 供给略大于需求
+        <span class="badge bg-secondary ms-2 me-1">供应过剩</span> 库存远超销量
+        <span class="badge bg-info ms-2 me-1">待售</span> 有库存但尚无销售
+      </div>
     </div>
 
   </div>
@@ -118,6 +126,24 @@ function initChart(id) {
   return c;
 }
 
+function getSupplyStatus(d) {
+  const { sold, available, gap, shortage } = d;
+  if (sold === 0 && available === 0)
+    return { text: '暂无数据', cls: 'bg-secondary', icon: 'dash-circle' };
+  if (sold === 0)
+    return { text: '待售', cls: 'bg-info', icon: 'clock' };
+  if (shortage > sold * 0.5)
+    return { text: `严重短缺（缺${shortage}）`, cls: 'bg-danger', icon: 'exclamation-triangle' };
+  if (shortage > 0)
+    return { text: `供不应求（缺${shortage}）`, cls: 'bg-warning text-dark', icon: 'exclamation-circle' };
+  const ratio = gap / sold;
+  if (ratio <= 0.3)
+    return { text: '供需平衡', cls: 'bg-success', icon: 'check-circle' };
+  if (ratio <= 1.0)
+    return { text: '供应偏松', cls: 'bg-primary', icon: 'arrow-up-circle' };
+  return { text: '供应过剩', cls: 'bg-secondary', icon: 'dash-circle' };
+}
+
 fetch('/api/analysis/demand/')
   .then(r => r.json())
   .then(data => {
@@ -128,26 +154,26 @@ fetch('/api/analysis/demand/')
     document.getElementById('ana-hot').textContent = summary.hot_product;
     document.getElementById('ana-shortage').textContent = summary.shortage_products_count;
 
-    // AI 摘要 — 优先显示大模型生成的文本
+    // AI 摘要
     const aiBox = document.getElementById('ai-summary');
     if (summary.summary_text) {
       aiBox.textContent = summary.summary_text;
-      // 显示 AI 模型来源标签
-      const badge = document.createElement('small');
-      badge.className = 'badge bg-secondary ms-2';
-      badge.textContent = summary.ai_model || 'AI';
-      aiBox.parentNode.appendChild(badge);
+      if (summary.ai_model) {
+        const badge = document.createElement('small');
+        badge.className = 'badge bg-secondary ms-2';
+        badge.textContent = summary.ai_model;
+        aiBox.parentNode.appendChild(badge);
+      }
     } else {
-      // 保底：模板生成
       let aiText = `当前平台共分析 ${summary.total_products_analyzed} 种农产品。`;
       aiText += `其中「${summary.hot_product}」销量最高，是当前最热门产品。`;
       if (summary.shortage_products_count > 0) {
-        aiText += ` ⚠️ 有 ${summary.shortage_products_count} 种产品供不应求：${summary.shortage_products.slice(0,3).join('、')}。建议相关农户增加产量。`;
+        aiText += `有 ${summary.shortage_products_count} 种产品供不应求：${summary.shortage_products.slice(0,3).join('、')}。建议相关农户增加产量。`;
       } else {
-        aiText += ` 目前供需基本平衡。`;
+        aiText += `目前供需基本平衡。`;
       }
       if (summary.regional_orders && summary.regional_orders.length > 0) {
-        aiText += ` 订单来源地区分布广泛，市场需求良好。`;
+        aiText += `订单来源地区分布广泛，市场需求良好。`;
       }
       aiBox.textContent = aiText;
     }
@@ -187,26 +213,24 @@ fetch('/api/analysis/demand/')
       });
     }
 
-    // 供需表格
+    // 供需表格（多状态）
     const tbody = document.getElementById('demand-table-body');
     if (tbody && data.product_supply_demand) {
       data.product_supply_demand.forEach(d => {
         const tr = document.createElement('tr');
-        let status = '<span class="badge bg-success">供需平衡</span>';
-        if (d.shortage > 0) status = `<span class="badge bg-danger">供不应求（缺${d.shortage}）</span>`;
-        else if (d.gap > d.sold) status = `<span class="badge bg-warning text-dark">供应过剩</span>`;
+        const st = getSupplyStatus(d);
         tr.innerHTML = `
           <td><strong>${d.product}</strong></td>
           <td>${d.sold}</td>
           <td>${d.available}</td>
-          <td>${status}</td>`;
+          <td><span class="badge ${st.cls}"><i class="bi bi-${st.icon}"></i> ${st.text}</span></td>`;
         tbody.appendChild(tr);
       });
     }
   })
   .catch(err => {
     console.error(err);
-    document.getElementById('ai-summary').textContent = '⚠️ 暂无足够订单数据生成分析，请先完成订单交易。';
+    document.getElementById('ai-summary').textContent = '暂无足够订单数据生成分析，请先完成订单交易。';
   });
 </script>
 {% endblock %}

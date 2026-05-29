@@ -8,19 +8,28 @@
   <div class="container">
     <h1 class="section-title mb-1">🌾 全部农产品</h1>
     <p class="text-muted">每一份产品都可追溯，买得放心吃得安心</p>
-    <div class="row mt-3">
-      <div class="col-md-6">
-        <input type="text" class="search-box" id="searchInput" placeholder="搜索产品名称…" oninput="filterProducts()">
+    <!-- 筛选区域 -->
+    <div class="row mt-3 g-2">
+      <div class="col-md-4">
+        <input type="text" class="search-box" id="searchInput" placeholder="搜索产品名称或描述…" oninput="applyFilters()">
       </div>
-      <div class="col-md-3">
-        <select class="form-select" id="categoryFilter" onchange="filterProducts()">
+      <div class="col-md-2">
+        <select class="form-select" id="categoryFilter" onchange="onCategoryChange()">
           <option value="">全部分类</option>
-          <option value="水果">水果</option>
-          <option value="蔬菜">蔬菜</option>
-          <option value="谷物">谷物</option>
-          <option value="畜禽">畜禽产品</option>
-          <option value="其他">其他</option>
         </select>
+      </div>
+      <div class="col-md-2">
+        <select class="form-select" id="varietyFilter" onchange="applyFilters()" disabled>
+          <option value="">全部品种</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <select class="form-select" id="originFilter" onchange="applyFilters()">
+          <option value="">全部产地</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <button class="btn btn-outline-secondary w-100" onclick="resetFilters()"><i class="bi bi-x-circle"></i> 清空筛选</button>
       </div>
     </div>
   </div>
@@ -42,21 +51,95 @@
 {% block extra_scripts %}
 <script>
 let allProducts = [];
+let filterOptions = { categories: [], varieties: {}, origins: [] };
 
-fetch('/api/products/')
+// 加载筛选选项
+fetch('/api/products/filter-options/')
   .then(r => r.json())
-  .then(data => {
-    allProducts = Array.isArray(data) ? data : [];
-    renderProducts(allProducts);
-  })
-  .catch(() => {
-    document.getElementById('product-grid').innerHTML = '<div class="col-12 text-center py-5 text-muted">加载失败，请刷新重试</div>';
+  .then(opts => {
+    filterOptions = opts;
+    // 填充分类下拉
+    const catSel = document.getElementById('categoryFilter');
+    opts.categories.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = c; opt.textContent = c;
+      catSel.appendChild(opt);
+    });
+    // 填充产地下拉
+    const originSel = document.getElementById('originFilter');
+    // 去重
+    const uniqueOrigins = [...new Set(opts.origins)];
+    uniqueOrigins.forEach(o => {
+      if (!o) return;
+      const opt = document.createElement('option');
+      opt.value = o; opt.textContent = o;
+      originSel.appendChild(opt);
+    });
   });
+
+function onCategoryChange() {
+  const cat = document.getElementById('categoryFilter').value;
+  const varietySel = document.getElementById('varietyFilter');
+  varietySel.innerHTML = '<option value="">全部品种</option>';
+  if (cat && filterOptions.varieties[cat]) {
+    filterOptions.varieties[cat].forEach(v => {
+      const opt = document.createElement('option');
+      opt.value = v; opt.textContent = v;
+      varietySel.appendChild(opt);
+    });
+    varietySel.disabled = false;
+  } else {
+    varietySel.disabled = true;
+  }
+  applyFilters();
+}
+
+function resetFilters() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('categoryFilter').value = '';
+  document.getElementById('varietyFilter').innerHTML = '<option value="">全部品种</option>';
+  document.getElementById('varietyFilter').disabled = true;
+  document.getElementById('originFilter').value = '';
+  applyFilters();
+}
+
+function getFilters() {
+  return {
+    search: document.getElementById('searchInput').value,
+    category: document.getElementById('categoryFilter').value,
+    variety: document.getElementById('varietyFilter').value,
+    origin: document.getElementById('originFilter').value,
+  };
+}
+
+function applyFilters() {
+  const f = getFilters();
+  let url = '/api/products/';
+  const params = [];
+  if (f.search) params.push('search=' + encodeURIComponent(f.search));
+  if (f.category) params.push('category=' + encodeURIComponent(f.category));
+  if (f.variety) params.push('variety=' + encodeURIComponent(f.variety));
+  if (f.origin) params.push('origin=' + encodeURIComponent(f.origin));
+  if (params.length) url += '?' + params.join('&');
+
+  const grid = document.getElementById('product-grid');
+  grid.innerHTML = '<div class="col-12 text-center py-5"><div class="loading-spinner"><div class="spinner-border text-success" role="status"><span class="visually-hidden">加载中…</span></div></div></div>';
+
+  fetch(url)
+    .then(r => r.json())
+    .then(data => {
+      const list = Array.isArray(data) ? data : (data.results || []);
+      renderProducts(list);
+    })
+    .catch(() => {
+      grid.innerHTML = '<div class="col-12 text-center py-5 text-muted">加载失败，请刷新重试</div>';
+    });
+}
 
 function renderProducts(list) {
   const grid = document.getElementById('product-grid');
   if (list.length === 0) {
-    grid.innerHTML = '<div class="col-12 text-center py-5 text-muted">暂无产品</div>';
+    grid.innerHTML = '<div class="col-12 text-center py-5 text-muted"><i class="bi bi-inbox" style="font-size:3rem;display:block;margin-bottom:12px;"></i>暂无产品</div>';
     return;
   }
   grid.innerHTML = list.map(p => `
@@ -83,15 +166,7 @@ function renderProducts(list) {
   `).join('');
 }
 
-function filterProducts() {
-  const q = document.getElementById('searchInput').value.toLowerCase();
-  const cat = document.getElementById('categoryFilter').value;
-  const filtered = allProducts.filter(p => {
-    if (q && !p.name.toLowerCase().includes(q)) return false;
-    if (cat && p.category !== cat) return false;
-    return true;
-  });
-  renderProducts(filtered);
-}
+// 初始加载全部产品
+applyFilters();
 </script>
 {% endblock %}
