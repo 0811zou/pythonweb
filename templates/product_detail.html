@@ -172,10 +172,70 @@
     </div>
   </div>
 </section>
+
+<!-- 评价区域 -->
+<section class="py-4" style="background: var(--white); border-top: 1px solid #f0f0f0;">
+  <div class="container">
+    <div class="row">
+      <div class="col-lg-8 offset-lg-2">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <h4 class="fw-bold mb-0"><i class="bi bi-star-fill text-warning"></i> 用户评价</h4>
+          {% if user.is_authenticated %}
+            <button class="btn btn-outline-warning btn-sm" id="write-review-btn" data-bs-toggle="modal" data-bs-target="#reviewModal">
+              <i class="bi bi-pencil-square"></i> 写评价
+            </button>
+          {% endif %}
+        </div>
+        <div id="reviews-list">
+          <div class="text-center py-4 text-muted"><i class="bi bi-arrow-repeat"></i> 加载中…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 评价弹窗 -->
+{% if user.is_authenticated %}
+<div class="modal fade" id="reviewModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">评价 {{ product.name }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-3">
+          <label class="form-label">评分</label>
+          <div id="star-rating" class="d-flex gap-1" style="font-size: 1.8rem; cursor: pointer;">
+            <span data-rating="1"><i class="bi bi-star"></i></span>
+            <span data-rating="2"><i class="bi bi-star"></i></span>
+            <span data-rating="3"><i class="bi bi-star"></i></span>
+            <span data-rating="4"><i class="bi bi-star"></i></span>
+            <span data-rating="5"><i class="bi bi-star"></i></span>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">评价内容 <small class="text-muted">（选填）</small></label>
+          <textarea class="form-control" id="review-comment" rows="3" maxlength="500" placeholder="分享一下您的购买体验…"></textarea>
+        </div>
+        <div id="review-error" class="alert alert-danger d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-warning" id="submit-review">提交评价</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- CSRF token for AJAX -->
+<div class="d-none">{% csrf_token %}</div>
 {% endblock %}
 
 {% block extra_scripts %}
 <script>
+// ===== 批次列表 =====
 const INITIAL_SHOW = 3;
 
 fetch(`/api/batches/?product={{ product.id }}`)
@@ -224,5 +284,106 @@ function renderBatches(container, batchList) {
     </div>
   `).join('');
 }
+
+// ===== 评价系统 =====
+let selectedRating = 5;
+
+function updateStars(rating) {
+  document.querySelectorAll('#star-rating span').forEach(s => {
+    const r = parseInt(s.dataset.rating);
+    s.innerHTML = r <= rating
+      ? '<i class="bi bi-star-fill text-warning"></i>'
+      : '<i class="bi bi-star text-muted"></i>';
+  });
+}
+
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function loadReviews() {
+  fetch(`/api/products/{{ product.id }}/reviews/`)
+    .then(r => r.json())
+    .then(reviews => {
+      const container = document.getElementById('reviews-list');
+      if (!Array.isArray(reviews) || reviews.length === 0) {
+        container.innerHTML = `
+          <div class="text-center py-4 text-muted">
+            <i class="bi bi-chat-square-text" style="font-size:2rem;"></i>
+            <p class="mt-2">暂无评价，成为第一个评价的人吧！</p>
+          </div>`;
+        return;
+      }
+      container.innerHTML = reviews.map(r => `
+        <div class="card mb-2 p-3" style="border-radius:10px;border-left:3px solid #ffc107;">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <strong>${escapeHtml(r.buyer_name)}</strong>
+              <span class="ms-2">${'★'.repeat(r.rating)}${'☆'.repeat(5 - r.rating)}</span>
+            </div>
+            <small class="text-muted">${r.created_at ? r.created_at.substring(0, 10) : ''}</small>
+          </div>
+          ${r.comment ? `<p class="mt-2 mb-0 text-muted">${escapeHtml(r.comment)}</p>` : ''}
+        </div>
+      `).join('');
+    })
+    .catch(() => {
+      document.getElementById('reviews-list').innerHTML =
+        '<div class="text-center py-4 text-muted">加载失败</div>';
+    });
+}
+
+// 星级交互
+document.querySelectorAll('#star-rating span').forEach(star => {
+  star.addEventListener('click', function() {
+    selectedRating = parseInt(this.dataset.rating);
+    updateStars(selectedRating);
+  });
+  star.addEventListener('mouseenter', function() {
+    updateStars(parseInt(this.dataset.rating));
+  });
+});
+document.getElementById('star-rating').addEventListener('mouseleave', function() {
+  updateStars(selectedRating);
+});
+
+// 提交评价
+document.getElementById('submit-review').addEventListener('click', function() {
+  const comment = document.getElementById('review-comment').value.trim();
+  const errorDiv = document.getElementById('review-error');
+  const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+
+  fetch(`/api/products/{{ product.id }}/reviews/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrfToken ? csrfToken.value : '',
+    },
+    body: JSON.stringify({ rating: selectedRating, comment: comment }),
+  })
+  .then(r => r.json().then(data => ({ status: r.status, data })))
+  .then(({ status, data }) => {
+    if (status === 201) {
+      bootstrap.Modal.getInstance(document.getElementById('reviewModal')).hide();
+      document.getElementById('review-comment').value = '';
+      selectedRating = 5;
+      updateStars(5);
+      loadReviews();
+    } else {
+      errorDiv.textContent = data.detail || '提交失败，请重试';
+      errorDiv.classList.remove('d-none');
+    }
+  })
+  .catch(() => {
+    errorDiv.textContent = '网络错误，请重试';
+    errorDiv.classList.remove('d-none');
+  });
+});
+
+// 初始化
+updateStars(5);
+loadReviews();
 </script>
 {% endblock %}

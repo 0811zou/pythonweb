@@ -27,6 +27,7 @@
           <li class="nav-item"><a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/"><i class="bi bi-house-door"></i> 首页</a></li>
           <li class="nav-item"><a class="nav-link {% if '/products' in request.path %}active{% endif %}" href="/products/"><i class="bi bi-basket"></i> 农产品</a></li>
           <li class="nav-item"><a class="nav-link {% if '/trace/' in request.path %}active{% endif %}" href="/trace/"><i class="bi bi-qr-code-scan"></i> 溯源查询</a></li>
+          <li class="nav-item"><a class="nav-link {% if '/map/' in request.path %}active{% endif %}" href="/map/"><i class="bi bi-map"></i> 产业地图</a></li>
           <li class="nav-item"><a class="nav-link {% if '/dashboard/' in request.path %}active{% endif %}" href="/dashboard/"><i class="bi bi-bar-chart"></i> 数据看板</a></li>
           {% if user.is_authenticated %}
             {% if user.farmerprofile %}

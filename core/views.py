@@ -9,7 +9,11 @@ from django.contrib import messages
 from django.db.models import Count, Sum, Q
 from django.db.models.functions import TruncMonth
 from .models import Product, ProductBatch, Order, OrderItem, SubsidyApplication, Training, FarmerProfile, Cooperative, Review
-from .serializers import ProductSerializer, ProductBatchSerializer, OrderSerializer, SubsidyApplicationSerializer, TrainingSerializer
+from .serializers import (
+    ProductSerializer, ProductBatchSerializer, OrderSerializer,
+    SubsidyApplicationSerializer, TrainingSerializer,
+    ReviewSerializer, ReviewDetailSerializer,
+)
 from .llm_service import generate_analysis
 
 class ProductViewSet(viewsets.ModelViewSet):
@@ -122,6 +126,10 @@ def home_view(request):
 
 def product_list_view(request):
     return render(request, 'products.html')
+
+def map_view(request):
+    """中国地图 — 各省产品分布"""
+    return render(request, 'map.html')
 
 def product_detail_view(request, pk):
     product = get_object_or_404(Product.objects.select_related('farmer__user', 'farmer__cooperative'), pk=pk)
@@ -261,6 +269,149 @@ def dashboard_view(request):
     return render(request, 'dashboard.html')
 
 
+# ===== 中国地图 — 各省产品分布 =====
+
+# 34个省级行政区（按长度降序排列，确保匹配短别名时不误匹配）
+CHINA_PROVINCES = [
+    '黑龙江省', '内蒙古自治区', '新疆维吾尔自治区', '西藏自治区', '广西壮族自治区',
+    '宁夏回族自治区', '香港特别行政区', '澳门特别行政区',
+    '北京市', '天津市', '上海市', '重庆市',
+    '河北省', '山西省', '辽宁省', '吉林省',
+    '江苏省', '浙江省', '安徽省', '福建省', '江西省', '山东省',
+    '河南省', '湖北省', '湖南省', '广东省', '海南省',
+    '四川省', '贵州省', '云南省', '陕西省', '甘肃省', '青海省', '台湾省',
+]
+
+
+def extract_province(address):
+    """从地址字符串中提取省份名称（支持短别名和市级地址匹配）"""
+    if not address:
+        return None
+    # 先按完整名称匹配
+    for p in CHINA_PROVINCES:
+        if address.startswith(p) or p in address:
+            return p
+    # 短别名匹配（如"宁夏"匹配"宁夏回族自治区"）
+    short_map = {
+        '黑龙江': '黑龙江省', '内蒙古': '内蒙古自治区', '新疆': '新疆维吾尔自治区',
+        '西藏': '西藏自治区', '广西': '广西壮族自治区', '宁夏': '宁夏回族自治区',
+        '香港': '香港特别行政区', '澳门': '澳门特别行政区',
+        '北京': '北京市', '天津': '天津市', '上海': '上海市', '重庆': '重庆市',
+    }
+    for short, full in short_map.items():
+        if short in address:
+            return full
+    # 市级地址→省份映射（城市名不含省份名时的回退）
+    city_map = {
+        '广州': '广东省', '深圳': '广东省', '珠海': '广东省', '东莞': '广东省', '佛山': '广东省',
+        '杭州': '浙江省', '宁波': '浙江省', '温州': '浙江省',
+        '南京': '江苏省', '苏州': '江苏省', '无锡': '江苏省',
+        '成都': '四川省', '武汉': '湖北省', '西安': '陕西省',
+        '长沙': '湖南省', '郑州': '河南省', '济南': '山东省', '青岛': '山东省',
+        '福州': '福建省', '厦门': '福建省', '昆明': '云南省', '南宁': '广西壮族自治区',
+        '合肥': '安徽省', '南昌': '江西省', '贵阳': '贵州省', '兰州': '甘肃省',
+        '太原': '山西省', '石家庄': '河北省', '沈阳': '辽宁省', '大连': '辽宁省',
+        '长春': '吉林省', '哈尔滨': '黑龙江省', '海口': '海南省', '三亚': '海南省',
+        '呼和浩特': '内蒙古自治区', '乌鲁木齐': '新疆维吾尔自治区', '拉萨': '西藏自治区',
+        '西宁': '青海省', '银川': '宁夏回族自治区',
+    }
+    for city, prov in city_map.items():
+        if city in address:
+            return prov
+    return None
+
+
+@api_view(['GET'])
+def province_products(request):
+    """各省产品分布 — 中国地图数据"""
+    from django.db.models import Count as _Count
+
+    # 每个省份的产品数（从农户地址提取省份）
+    province_products_count = {}
+    for fp in FarmerProfile.objects.select_related('cooperative').all():
+        prov = extract_province(fp.address)
+        if prov:
+            province_products_count[prov] = province_products_count.get(prov, 0) + Product.objects.filter(farmer=fp).count()
+
+    # 每个省份的已售订单量（从订单地址提取省份）
+    province_orders = {}
+    for order in Order.objects.exclude(status='cancelled').values('address').annotate(cnt=_Count('id')):
+        prov = extract_province(order.get('address', ''))
+        if prov:
+            province_orders[prov] = province_orders.get(prov, 0) + order['cnt']
+
+    # 构建返回数据（所有34个省份都包括）
+    provinces_data = []
+    for prov in CHINA_PROVINCES:
+        provinces_data.append({
+            'name': prov,
+            'product_count': province_products_count.get(prov, 0),
+            'order_count': province_orders.get(prov, 0),
+        })
+
+    return Response({
+        'provinces': provinces_data,
+        'total_provinces_with_products': sum(1 for p in provinces_data if p['product_count'] > 0),
+    })
+
+
+# ===== 产品评价 =====
+
+@api_view(['GET', 'POST'])
+def product_reviews(request, product_id):
+    """获取或创建产品评价
+
+    GET: 返回该产品的所有评价
+    POST: 创建评价（仅限购买过该产品的用户，可选填写评论）
+    """
+    product = get_object_or_404(Product, pk=product_id)
+
+    if request.method == 'GET':
+        reviews = Review.objects.filter(
+            order__items__product_batch__product=product
+        ).select_related('buyer', 'order').prefetch_related(
+            'order__items__product_batch__product'
+        ).distinct().order_by('-created_at')
+
+        serializer = ReviewDetailSerializer(reviews, many=True)
+        return Response(serializer.data)
+
+    if request.method == 'POST':
+        if not request.user.is_authenticated:
+            return Response({'detail': '请先登录'}, status=status.HTTP_401_UNAUTHORIZED)
+
+        # 检查用户是否购买过该产品
+        has_purchased = OrderItem.objects.filter(
+            order__buyer=request.user,
+            product_batch__product=product
+        ).exclude(order__status='cancelled').exists()
+
+        if not has_purchased:
+            return Response({'detail': '只有购买过该产品的用户才能评价'},
+                          status=status.HTTP_403_FORBIDDEN)
+
+        # 查找用户购买该产品的订单
+        order = Order.objects.filter(
+            buyer=request.user,
+            items__product_batch__product=product
+        ).exclude(status='cancelled').distinct().first()
+
+        if not order:
+            return Response({'detail': '未找到有效订单'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 检查是否已评价过该订单
+        existing = Review.objects.filter(order=order, buyer=request.user).first()
+        if existing:
+            return Response({'detail': '您已对该订单进行过评价'},
+                          status=status.HTTP_409_CONFLICT)
+
+        serializer = ReviewSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(order=order, buyer=request.user, farmer=product.farmer)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
 # ===== 智能供需分析 =====
 
 @api_view(['GET'])
@@ -275,7 +426,7 @@ def demand_analysis(request):
             total_qty=Sum('quantity'),
             total_revenue=Sum('price')
         )
-        .order_by('-total_qty')[:10]
+        .order_by('-total_qty')
     )
 
     # 2. 各产品供需情况（遍历所有有批次的产品，含销量为0的）
