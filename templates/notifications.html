@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}消息通知 - 智溯农链{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width: 800px;">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0"><i class="bi bi-bell text-success"></i> 消息通知</h4>
+    {% if notifications %}
+    <a href="?mark_read=all" class="btn btn-outline-success btn-sm"><i class="bi bi-check-all"></i> 全部已读</a>
+    {% endif %}
+  </div>
+  {% if notifications %}
+  <div class="list-group">
+    {% for n in notifications %}
+    <a href="{% if n.link %}{{ n.link }}{% else %}{% url 'notifications_mark_read' n.id %}{% endif %}"
+       class="list-group-item list-group-item-action d-flex gap-3 {% if not n.is_read %}list-group-item-success{% endif %}">
+      <div style="width:40px;text-align:center;font-size:1.4rem;">
+        {% if n.notification_type == 'order' %}<i class="bi bi-receipt text-primary"></i>
+        {% elif n.notification_type == 'batch' %}<i class="bi bi-box-seam text-success"></i>
+        {% elif n.notification_type == 'product' %}<i class="bi bi-basket text-warning"></i>
+        {% else %}<i class="bi bi-megaphone text-info"></i>{% endif %}
+      </div>
+      <div class="flex-grow-1">
+        <div class="d-flex justify-content-between">
+          <strong>{{ n.title }}</strong>
+          <small class="text-muted">{{ n.created_at|date:'m-d H:i' }}</small>
+        </div>
+        <p class="mb-0 small text-muted">{{ n.message }}</p>
+      </div>
+      {% if not n.is_read %}<span class="badge bg-success rounded-pill align-self-center">新</span>{% endif %}
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-bell-slash" style="font-size:3rem;display:block;margin-bottom:12px;"></i>
+    <p>暂无消息通知</p>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% block title %}排行榜 - 智溯农链{% endblock %}
+{% block content %}
+<div class="container py-4">
+  <h4 class="fw-bold mb-4"><i class="bi bi-trophy text-warning"></i> 农产品排行榜</h4>
+
+  <ul class="nav nav-tabs mb-4" id="rankTab">
+    <li class="nav-item"><a class="nav-link active" href="#hot" data-bs-toggle="tab"><i class="bi bi-fire"></i> 热销排行</a></li>
+    <li class="nav-item"><a class="nav-link" href="#new" data-bs-toggle="tab"><i class="bi bi-star"></i> 新品上市</a></li>
+    <li class="nav-item"><a class="nav-link" href="#best" data-bs-toggle="tab"><i class="bi bi-hand-thumbs-up"></i> 好评推荐</a></li>
+  </ul>
+
+  <div class="tab-content">
+    {# 热销排行 #}
+    <div class="tab-pane fade show active" id="hot">
+      <div class="row g-3">
+        {% for p in hot_products %}
+        <div class="col-lg-3 col-md-4 col-6">
+          <div class="card product-card h-100">
+            {% if forloop.counter <= 3 %}
+            <span class="position-absolute top-0 start-0 badge bg-danger" style="z-index:2;">#{{ forloop.counter }}</span>
+            {% endif %}
+            {% if p.image %}
+            <img src="{{ p.image.url }}" class="card-img-top" alt="{{ p.name }}" style="height:160px;object-fit:cover;">
+            {% else %}
+            <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height:160px;">
+              <i class="bi bi-image text-muted" style="font-size:2.5rem;"></i>
+            </div>
+            {% endif %}
+            <div class="card-body p-2">
+              <h6 class="card-title mb-1"><a href="{% url 'product_detail' p.id %}" class="text-decoration-none">{{ p.name }}</a></h6>
+              <p class="mb-0 text-danger fw-bold">¥{{ p.price }}</p>
+              <small class="text-muted">已售 {{ p.total_sold|default:0 }}{{ p.unit }}</small>
+            </div>
+          </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center py-5 text-muted">暂无数据</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# 新品上市 #}
+    <div class="tab-pane fade" id="new">
+      <div class="row g-3">
+        {% for p in newest_products %}
+        <div class="col-lg-3 col-md-4 col-6">
+          <div class="card product-card h-100">
+            <span class="position-absolute top-0 end-0 badge bg-success" style="z-index:2;">新品</span>
+            {% if p.image %}
+            <img src="{{ p.image.url }}" class="card-img-top" alt="{{ p.name }}" style="height:160px;object-fit:cover;">
+            {% else %}
+            <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height:160px;">
+              <i class="bi bi-image text-muted" style="font-size:2.5rem;"></i>
+            </div>
+            {% endif %}
+            <div class="card-body p-2">
+              <h6 class="card-title mb-1"><a href="{% url 'product_detail' p.id %}" class="text-decoration-none">{{ p.name }}</a></h6>
+              <p class="mb-0 text-danger fw-bold">¥{{ p.price }}</p>
+              <small class="text-muted">{{ p.created_at|date:'Y-m-d' }}</small>
+            </div>
+          </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center py-5 text-muted">暂无数据</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {# 好评推荐 #}
+    <div class="tab-pane fade" id="best">
+      <div class="row g-3">
+        {% for p in best_products %}
+        <div class="col-lg-3 col-md-4 col-6">
+          <div class="card product-card h-100">
+            {% if p.avg_rating >= 4 %}
+            <span class="position-absolute top-0 start-0 badge bg-warning text-dark" style="z-index:2;"><i class="bi bi-star-fill"></i> {{ p.avg_rating|floatformat:1 }}</span>
+            {% endif %}
+            {% if p.image %}
+            <img src="{{ p.image.url }}" class="card-img-top" alt="{{ p.name }}" style="height:160px;object-fit:cover;">
+            {% else %}
+            <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height:160px;">
+              <i class="bi bi-image text-muted" style="font-size:2.5rem;"></i>
+            </div>
+            {% endif %}
+            <div class="card-body p-2">
+              <h6 class="card-title mb-1"><a href="{% url 'product_detail' p.id %}" class="text-decoration-none">{{ p.name }}</a></h6>
+              <p class="mb-0 text-danger fw-bold">¥{{ p.price }}</p>
+            </div>
+          </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center py-5 text-muted">暂无数据</div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

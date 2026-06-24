@@ -23,6 +23,8 @@ from .views import (
     cart_view, cart_add, cart_remove, cart_checkout,
     favorites_view, favorite_toggle,
     farmer_shop_settings,
+    notifications_view, notifications_unread_count, notifications_mark_read,
+    rankings_view, cart_batch_checkout,
 )
 
 router = routers.DefaultRouter()
@@ -86,4 +88,12 @@ urlpatterns = [
     path('manage/batches/<int:pk>/<str:action>/', admin_batch_review, name='admin_batch_review'),
     path('manage/export/orders/', export_orders_csv, name='export_orders'),
     path('manage/export/products/', export_products_csv, name='export_products'),
+    # 通知
+    path('notifications/', notifications_view, name='notifications'),
+    path('notifications/unread-count/', notifications_unread_count, name='notifications_unread'),
+    path('notifications/mark-read/<int:pk>/', notifications_mark_read, name='notifications_mark_read'),
+    # 排行榜
+    path('rankings/', rankings_view, name='rankings'),
+    # 购物车批量下单
+    path('cart/batch-checkout/', cart_batch_checkout, name='cart_batch_checkout'),
 ]

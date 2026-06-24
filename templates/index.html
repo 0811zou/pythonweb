@@ -87,7 +87,24 @@
   </div>
 </section>
 
-<!-- 助农专区 -->
+<!-- 猜你喜欢 -->
+<section class="py-5" style="background: #f8fdf9;">
+  <div class="container">
+    <div class="d-flex align-items-center gap-3 mb-1">
+      <span style="font-size:2rem;">🎯</span>
+      <div>
+        <h2 class="section-title mb-0">猜你喜欢</h2>
+        <p class="text-muted mb-0">基于你的喜好为你推荐</p>
+      </div>
+    </div>
+    <p class="section-subtitle" style="margin-left: 3.5rem;">看看这些产品是否合你心意</p>
+    <div class="row g-4" id="recommend-products-grid">
+      <div class="col-12 text-center py-4"><div class="spinner-border text-success" role="status"></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 帮扶助农 -->
 <section class="py-5" style="background: linear-gradient(135deg, #fff8e1, #fff3e0);">
   <div class="container">
     <div class="d-flex align-items-center gap-3 mb-1">
@@ -305,6 +322,13 @@ Promise.all([
     ).join('');
   }
 }).catch(() => {
+  // 猜你喜欢 - 随机推荐8个产品
+  const shuffled = [...products].sort(() => Math.random() - 0.5);
+  const recommendGrid = document.getElementById('recommend-products-grid');
+  recommendGrid.innerHTML = shuffled.slice(0, 8).map(p =>
+    productCard(p, { text: '推荐', bg: 'info text-dark' })
+  ).join('');
+
   ['hot-products-grid', 'new-products-grid', 'help-products-grid'].forEach(id => {
     document.getElementById(id).innerHTML = '<div class="col-12 text-center py-4 text-muted">加载失败</div>';
   });

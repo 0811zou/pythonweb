@@ -16,7 +16,8 @@ from django.utils import timezone
 from django.db.models.functions import TruncMonth
 from decimal import Decimal, InvalidOperation
 from functools import wraps
-from .models import Product, ProductBatch, Order, OrderItem, SubsidyApplication, Training, FarmerProfile, Cooperative, Review, TraceEvent, Announcement, Cart, CartItem, Favorite
+from .models import Product, ProductBatch, Order, OrderItem, SubsidyApplication, Training, FarmerProfile, Cooperative, Review, TraceEvent, Announcement, Cart, CartItem, Favorite, Notification
+from .notify import notify, notify_farmer, notify_buyer
 from .permissions import IsAdminOrReadOnly, IsFarmerOwnerOrAdmin, IsOrderParticipantOrAdmin, IsSubsidyOwnerOrAdmin, get_farmer_profile
 from .serializers import (
     ProductSerializer, ProductBatchSerializer, OrderSerializer,
@@ -718,6 +719,12 @@ def order_create_view(request):
                 OrderItem.objects.create(order=order, product_batch=batch, quantity=quantity, price=product.price)
                 batch.quantity -= quantity
                 batch.save(update_fields=['quantity'])
+                # 通知农户
+                farmer_user = product.farmer.user
+                notify(farmer_user, 'order',
+                    f'新订单 #{order.id}',
+                    f'消费者 {request.user.username} 购买了 {product.name} x{quantity}，总价 ¥{total}',
+                    reverse('farmer_orders'))
         except (InvalidOperation, ValueError):
             return render(request, 'order_create.html', {'product': product, 'error': '订单金额计算失败'})
         messages.success(request, f'下单成功！订单编号 #{order.id}')
@@ -1023,6 +1030,11 @@ def farmer_set_tracking(request, order_id):
             order.status = 'shipped'
             order.shipped_at = timezone.now()
             order.save(update_fields=['tracking_number', 'status', 'shipped_at'])
+            # 通知买家
+            notify_buyer(order, 'order',
+                f'订单 #{order.id} 已发货',
+                f'快递单号: {tracking}',
+                reverse('consumer_orders'))
             messages.success(request, '发货成功')
         return redirect('farmer_orders')
     return render(request, 'farmer/tracking_form.html', {'order': order})
@@ -1135,6 +1147,17 @@ def admin_product_review(request, pk, action):
         messages.error(request, '未知审核操作')
         return redirect('admin_products')
     product.save(update_fields=['status', 'review_note'])
+    # 通知农户
+    if action == 'approve':
+        notify_farmer(product, 'product',
+            f'产品「{product.name}」已通过审核',
+            '你的产品已上架，消费者可以浏览和购买了',
+            reverse('farmer_dashboard'))
+    else:
+        notify_farmer(product, 'product',
+            f'产品「{product.name}」未通过审核',
+            f'原因: {product.review_note}',
+            reverse('farmer_dashboard'))
     return redirect('admin_products')
 
 
@@ -1261,6 +1284,19 @@ def admin_batch_review(request, pk, action):
         messages.error(request, '未知操作')
         return redirect('admin_batches')
     batch.save(update_fields=['status'])
+    # 通知农户
+    farmer_user = batch.product.farmer.user
+    if action == 'approve':
+        notify(farmer_user, 'batch',
+            f'批次 {batch.batch_code} 质检通过',
+            f'产品「{batch.product.name}」批次已通过审核，二维码已可用',
+            reverse('farmer_batch_detail', args=[batch.pk]))
+    else:
+        note = request.POST.get('note', '').strip() or '未通过质检审核'
+        notify(farmer_user, 'batch',
+            f'批次 {batch.batch_code} 未通过',
+            f'原因: {note}',
+            reverse('farmer_batch_detail', args=[batch.pk]))
     return redirect('admin_batches')
 
 
@@ -1280,3 +1316,89 @@ def farmer_shop_settings(request):
         messages.success(request, '店铺信息已保存')
         return redirect('farmer_shop_settings')
     return render(request, 'farmer/shop_settings.html', {'profile': profile})
+
+
+# ===== 通知系统 =====
+
+@login_required
+def notifications_view(request):
+    """通知列表"""
+    notifs = Notification.objects.filter(recipient=request.user)
+    # 标记全部已读
+    if request.GET.get('mark_read') == 'all':
+        notifs.filter(is_read=False).update(is_read=True)
+        return redirect('notifications')
+    return render(request, 'notifications.html', {'notifications': notifs})
+
+
+@login_required
+def notifications_unread_count(request):
+    """未读通知数（JSON API）"""
+    count = Notification.objects.filter(recipient=request.user, is_read=False).count()
+    from django.http import JsonResponse
+    return JsonResponse({'count': count})
+
+
+@login_required
+def notifications_mark_read(request, pk):
+    """标记单条已读"""
+    Notification.objects.filter(pk=pk, recipient=request.user).update(is_read=True)
+    return redirect(request.META.get('HTTP_REFERER', 'notifications'))
+
+
+# ===== 排行榜 =====
+
+def rankings_view(request):
+    """热销/好评/新品排行榜"""
+    hot = Product.objects.filter(status='approved').annotate(
+        total_sold=Sum('batches__orderItems__quantity', default=0)
+    ).order_by('-total_sold')[:20]
+    newest = Product.objects.filter(status='approved').order_by('-created_at')[:20]
+    best = Product.objects.filter(status='approved').annotate(
+        avg_rating=Sum('review__rating') / Count('review', default=1)
+    ).order_by('-avg_rating')[:20]
+    return render(request, 'rankings.html', {
+        'hot_products': hot,
+        'newest_products': newest,
+        'best_products': best,
+    })
+
+
+# ===== 购物车多选批量下单 =====
+
+@login_required
+def cart_batch_checkout(request):
+    """购物车勾选多件商品批量下单"""
+    cart = get_object_or_404(Cart, user=request.user)
+    if request.method == 'POST':
+        item_ids = request.POST.getlist('selected_items')
+        address = request.POST.get('address', '').strip()
+        if not item_ids:
+            messages.error(request, '请选择要购买的商品')
+            return redirect('cart_view')
+        if not address:
+            messages.error(request, '请填写收货地址')
+            return redirect('cart_view')
+        items = CartItem.objects.filter(id__in=item_ids, cart=cart).select_related('product__farmer')
+        if not items:
+            messages.error(request, '所选商品不存在')
+            return redirect('cart_view')
+        try:
+            with transaction.atomic():
+                total = sum(item.product.price * item.quantity for item in items)
+                order = Order.objects.create(buyer=request.user, total_amount=total, address=address, status='confirmed')
+                for item in items:
+                    batch = ProductBatch.objects.filter(product=item.product, status='approved').first()
+                    OrderItem.objects.create(order=order, product_batch=batch, quantity=item.quantity, price=item.product.price)
+                    # 通知农户
+                    notify(item.product.farmer.user, 'order',
+                        f'新订单 #{order.id}',
+                        f'消费者 {request.user.username} 购买了 {item.product.name} x{item.quantity}，总价 ¥{item.product.price * item.quantity}',
+                        reverse('farmer_orders'))
+                items.delete()
+                messages.success(request, f'下单成功！订单编号 #{order.id}')
+                return redirect('consumer_orders')
+        except Exception as e:
+            messages.error(request, f'下单失败：{str(e)}')
+            return redirect('cart_view')
+    return redirect('cart_view')

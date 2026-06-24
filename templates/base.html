@@ -27,6 +27,7 @@
           <li class="nav-item"><a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/"><i class="bi bi-house-door"></i> 首页</a></li>
           <li class="nav-item"><a class="nav-link {% if '/products' in request.path %}active{% endif %}" href="/products/"><i class="bi bi-basket"></i> 农产品</a></li>
           <li class="nav-item"><a class="nav-link {% if '/trace/' in request.path %}active{% endif %}" href="/trace/"><i class="bi bi-qr-code-scan"></i> 溯源查询</a></li>
+          <li class="nav-item"><a class="nav-link {% if '/rankings' in request.path %}active{% endif %}" href="/rankings/"><i class="bi bi-trophy"></i> 排行榜</a></li>
           <li class="nav-item"><a class="nav-link {% if '/map/' in request.path %}active{% endif %}" href="/map/"><i class="bi bi-map"></i> 产地分布</a></li>
           <li class="nav-item"><a class="nav-link {% if '/dashboard/' in request.path %}active{% endif %}" href="/dashboard/"><i class="bi bi-bar-chart"></i> 数据看板</a></li>
           {% if user.is_authenticated %}
@@ -49,7 +50,11 @@
             {% if user.farmerprofile %}
               <a href="{% url 'farmer_dashboard' %}" class="btn btn-outline-success btn-sm"><i class="bi bi-person-circle"></i> 农户工作台</a>
             {% endif %}
-            <span class="text-muted small me-2"><i class="bi bi-person-circle"></i> {{ user.username }}</span>
+            <a href="{% url 'notifications' %}" class="btn btn-outline-success btn-sm position-relative me-1" title="消息通知">
+              <i class="bi bi-bell"></i>
+              <span class="notification-badge" id="notifBadge" style="display:none;">0</span>
+            </a>
+            <span class="text-muted small me-2 d-none d-md-inline"><i class="bi bi-person-circle"></i> {{ user.username }}</span>
             <a href="{% url 'logout' %}" class="btn btn-outline-danger btn-sm"><i class="bi bi-box-arrow-right"></i> 退出</a>
           {% else %}
             <a href="{% url 'login' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-box-arrow-in-right"></i> 登录</a>
@@ -106,6 +111,52 @@
   </footer>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <style>
+    .notification-badge {
+      position: absolute; top: -4px; right: -6px;
+      background: #dc3545; color: #fff;
+      font-size: 0.6rem; padding: 1px 5px;
+      border-radius: 10px; line-height: 1.2;
+      min-width: 16px; text-align: center;
+    }
+    /* 移动端优化 */
+    @media (max-width: 768px) {
+      .navbar .btn-sm { font-size: 0.75rem; padding: 0.2rem 0.4rem; }
+    }
+  </style>
+  <script>
+    // 移动端：表格自动可横向滚动
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('table').forEach(function(t) {
+        if (!t.closest('.table-responsive')) {
+          var w = document.createElement('div');
+          w.className = 'table-responsive';
+          w.style.overflowX = 'auto';
+          w.style.WebkitOverflowScrolling = 'touch';
+          t.parentNode.insertBefore(w, t);
+          w.appendChild(t);
+        }
+      });
+    });
+    // 自动获取未读通知数
+    function checkNotifications() {
+      fetch('/notifications/unread-count/')
+        .then(r => r.json())
+        .then(d => {
+          const badge = document.getElementById('notifBadge');
+          if (d.count > 0) {
+            badge.textContent = d.count;
+            badge.style.display = 'inline';
+          } else {
+            badge.style.display = 'none';
+          }
+        }).catch(() => {});
+    }
+    {% if user.is_authenticated %}
+    checkNotifications();
+    setInterval(checkNotifications, 15000);
+    {% endif %}
+  </script>
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>
