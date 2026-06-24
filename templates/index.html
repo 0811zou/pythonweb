@@ -200,13 +200,27 @@ fetch('/api/stats/dashboard/').then(r=>r.json()).then(d => {
   document.querySelectorAll('.stat-item .number').forEach(el => el.textContent = '?');
 });
 
+// 递归获取所有分页产品
+function getAllProducts() {
+  function loadPage(url) {
+    return fetch(url).then(function(r) { return r.json(); }).then(function(page) {
+      var list = page.results || [];
+      var nextUrl = page.next;
+      if (!nextUrl) return list;
+      return loadPage(nextUrl).then(function(nextList) {
+        return list.concat(nextList);
+      });
+    });
+  }
+  return loadPage('/api/products/?page=1');
+}
+
 // 加载所有产品和市场分析数据
 Promise.all([
-  fetch('/api/products/').then(r => r.json()),
+  getAllProducts(),
   fetch('/api/analysis/demand/').then(r => r.json()).catch(() => null),
-]).then(([prodsData, demandData]) => {
-  const products = prodsData.results || prodsData || [];
-  if (!products.length) return;
+]).then(([products, demandData]) => {
+  if (!products || !products.length) return;
 
   // 建立 名称->产品 映射
   const nameMap = {};
