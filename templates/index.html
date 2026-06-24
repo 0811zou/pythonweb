@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}智溯农链 —— 基于 Django + DRF + 大模型的农产品溯源与智能供需匹配平台{% endblock %}
+{% block title %}智溯农链 —— 农产品溯源与智能供需匹配平台{% endblock %}
 
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
@@ -14,13 +14,13 @@
     <div class="row align-items-center">
       <div class="col-lg-7">
         <div class="mb-3">
-          <span class="badge bg-success me-2">Django REST Framework</span>
-          <span class="badge bg-primary me-2">大模型分析</span>
-          <span class="badge bg-warning text-dark me-2">ECharts 可视化</span>
-          <span class="badge bg-info text-dark">Docker 部署</span>
+          <span class="badge bg-success me-2"><i class="bi bi-shield-check"></i> 溯源认证</span>
+          <span class="badge bg-primary me-2"><i class="bi bi-graph-up"></i> 数据分析</span>
+          <span class="badge bg-warning text-dark me-2"><i class="bi bi-map"></i> 产地分布</span>
+          <span class="badge bg-info text-dark"><i class="bi bi-qr-code"></i> 扫码溯源</span>
         </div>
         <h1>从田间到餐桌<br>从数据到决策</h1>
-        <p>智溯农链基于 Django + DRF 构建，融合大模型分析与二维码溯源技术，消费者扫码可追溯产品全链路信息，农户通过 AI 需求分析洞察市场趋势，实现农产品精准产销对接。</p>
+        <p>智溯农链融合二维码溯源与数据分析技术，消费者扫码可追溯产品全链路信息，农户通过市场分析洞察需求趋势，实现农产品精准产销对接。</p>
         <div class="d-flex flex-wrap gap-3">
           <a href="/products/" class="btn btn-primary btn-lg"><i class="bi bi-basket"></i> 浏览农产品</a>
           <a href="/trace/" class="btn btn-outline-light btn-lg"><i class="bi bi-qr-code-scan"></i> 扫码溯源</a>
@@ -135,7 +135,7 @@
         <div class="text-center">
           <div class="feature-icon mx-auto"><i class="bi bi-cpu"></i></div>
           <h5>AI 需求分析</h5>
-          <p class="small text-muted">大模型分析市场数据，为农户提供智能销售决策支持</p>
+          <p class="small text-muted">智能分析市场数据，为农户提供精准销售决策支持</p>
         </div>
       </div>
     </div>
