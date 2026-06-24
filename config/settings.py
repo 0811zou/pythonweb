@@ -1,10 +1,14 @@
 from pathlib import Path
-import os
+import environ
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-SECRET_KEY = os.environ.get('SECRET_KEY', 'replace-this-with-a-secret-key')
-DEBUG = os.environ.get('DEBUG', '1') == '1'
-ALLOWED_HOSTS = ['*']
+env = environ.Env()
+environ.Env.read_env(BASE_DIR / '.env')
+
+SECRET_KEY = env('SECRET_KEY', default='django-insecure-change-me-in-production')
+DEBUG = env.bool("DEBUG", default=True)
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["127.0.0.1", "localhost", "testserver"])
+SITE_BASE_URL = env("SITE_BASE_URL", default="http://localhost:8000")
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -28,12 +32,13 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
 STATICFILES_DIRS = [
     BASE_DIR / 'core' / 'static',
 ]
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_ROOT = env.path('STATIC_ROOT', default=BASE_DIR / 'staticfiles')
 
 ROOT_URLCONF = 'config.urls'
 
@@ -55,12 +60,8 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-# SQLite for local development
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': env.db('DATABASE_URL', default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
 }
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -97,3 +98,13 @@ CORS_ALLOWED_ORIGINS = [
     'http://127.0.0.1:8000',
 ]
 CORS_ALLOW_CREDENTIALS = True
+
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[])
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=False)
+SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=False)
+CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=False)
+SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=0)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=False)
+SECURE_HSTS_PRELOAD = env.bool('SECURE_HSTS_PRELOAD', default=False)
+X_FRAME_OPTIONS = 'DENY'

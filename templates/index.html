@@ -148,6 +148,16 @@ const catColors = {
   '粮油': '#fcc419', '干货': '#e8590c', '畜禽': '#339af0'
 };
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+}
+
 function productCard(p, badge, statusLine) {
   const icon = catIcon[p.category] || 'basket';
   const color = catColors[p.category] || '#2d8a4e';
@@ -156,19 +166,19 @@ function productCard(p, badge, statusLine) {
       <div class="card h-100 position-relative">
         ${badge ? `<span class="position-absolute top-0 start-0 badge bg-${badge.bg} m-2">${badge.text}</span>` : ''}
         ${p.image ? `
-          <img src="${p.image}" class="card-img-top" style="height:160px;object-fit:cover;" alt="${p.name}">
+          <img src="${escapeHtml(p.image)}" class="card-img-top" style="height:160px;object-fit:cover;" alt="${escapeHtml(p.name)}">
         ` : `
           <div class="card-img-top d-flex align-items-center justify-content-center" style="height:140px;background:${color}15;font-size:2.8rem;color:${color};">
             <i class="bi bi-${icon}"></i>
           </div>
         `}
         <div class="card-body d-flex flex-column">
-          <span class="badge-trace mb-1" style="align-self:flex-start;background:${color}20;color:${color};">${p.category || '农产品'}</span>
-          <h5 class="card-title">${p.name}</h5>
-          <p class="card-text small flex-grow-1">${p.description ? p.description.substring(0,60) : '来自优质产地的健康农产品'}</p>
+          <span class="badge-trace mb-1" style="align-self:flex-start;background:${color}20;color:${color};">${escapeHtml(p.category || '农产品')}</span>
+          <h5 class="card-title">${escapeHtml(p.name)}</h5>
+          <p class="card-text small flex-grow-1">${escapeHtml(p.description ? p.description.substring(0,60) : '来自优质产地的健康农产品')}</p>
           ${statusLine ? `<p class="small mb-1">${statusLine}</p>` : ''}
           <div class="d-flex justify-content-between align-items-center mt-auto">
-            <span class="price" style="color:${color};">¥${parseFloat(p.price).toFixed(2)} <small>/ ${p.unit||'kg'}</small></span>
+            <span class="price" style="color:${color};">¥${Number.parseFloat(p.price).toFixed(2)} <small>/ ${escapeHtml(p.unit||'kg')}</small></span>
             <a href="/products/${p.id}/" class="btn btn-sm" style="border-color:${color};color:${color};">详情</a>
           </div>
         </div>

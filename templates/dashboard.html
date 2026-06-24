@@ -137,6 +137,16 @@
 
 {% block extra_scripts %}
 <script>
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+}
+
 function initChart(domId) {
   const dom = document.getElementById(domId);
   if (!dom) return null;
@@ -221,12 +231,13 @@ fetch('/api/stats/dashboard/')
       if (tbody && data.recent_orders) {
         data.recent_orders.forEach(o => {
           const tr = document.createElement('tr');
+          const buyer = o.buyer && o.buyer.username ? o.buyer.username : '用户';
           tr.innerHTML = `
-            <td>#${o.id}</td>
-            <td>${o.buyer || '用户'}</td>
-            <td>¥${parseFloat(o.total_amount || 0).toFixed(2)}</td>
-            <td><span class="badge bg-${statusColors[o.status] ? 'success' : 'secondary'}">${statusMap[o.status] || o.status}</span></td>
-            <td class="small">${o.created_at ? o.created_at.substring(0,10) : ''}</td>`;
+            <td>#${escapeHtml(o.id)}</td>
+            <td>${escapeHtml(buyer)}</td>
+            <td>¥${Number.parseFloat(o.total_amount || 0).toFixed(2)}</td>
+            <td><span class="badge bg-${statusColors[o.status] ? 'success' : 'secondary'}">${escapeHtml(statusMap[o.status] || o.status)}</span></td>
+            <td class="small">${escapeHtml(o.created_at ? o.created_at.substring(0,10) : '')}</td>`;
           tbody.appendChild(tr);
         });
       }

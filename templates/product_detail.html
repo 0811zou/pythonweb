@@ -169,14 +169,69 @@
           </div>
         </div>
       </div>
+
+      <!-- ===== 用户评价 ===== -->
+      <div class="row mt-4">
+        <div class="col-12">
+          <div class="info-card">
+            <h5 class="fw-bold mb-3"><i class="bi bi-star text-warning"></i> 产品评价</h5>
+            <div id="reviews-list">
+              <p class="small text-muted mb-0"><i class="bi bi-arrow-repeat"></i> 加载中…</p>
+            </div>
+            <div id="review-form-container" class="mt-3 d-none">
+              <hr>
+              <h6 class="fw-bold"><i class="bi bi-pencil-square"></i> 撰写评价</h6>
+              <form id="review-form">
+                <div class="mb-2">
+                  <label class="form-label small">评分</label>
+                  <div class="star-rating">
+                    <span class="star" data-value="1">☆</span>
+                    <span class="star" data-value="2">☆</span>
+                    <span class="star" data-value="3">☆</span>
+                    <span class="star" data-value="4">☆</span>
+                    <span class="star" data-value="5">☆</span>
+                    <input type="hidden" name="rating" id="review-rating" value="5">
+                  </div>
+                </div>
+                <div class="mb-2">
+                  <textarea class="form-control" id="review-comment" rows="2" placeholder="分享你的使用感受…" maxlength="500"></textarea>
+                </div>
+                <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-send"></i> 提交评价</button>
+                <span id="review-msg" class="small ms-2"></span>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 {% endblock %}
 
 {% block extra_scripts %}
+<style>
+.star-rating .star { font-size: 1.5rem; cursor: pointer; color: #ddd; transition: color 0.2s; }
+.star-rating .star.active { color: #f39c12; }
+.star-rating .star:hover,
+.star-rating .star.hover { color: #f1c40f; }
+.review-item { border-bottom: 1px solid #f0f0f0; padding: 12px 0; }
+.review-item:last-child { border-bottom: none; }
+.review-stars { color: #f39c12; font-size: 0.95rem; }
+</style>
 <script>
 const INITIAL_SHOW = 3;
+const IS_AUTHENTICATED = {{ user.is_authenticated|yesno:"true,false" }};
+const CSRF_TOKEN = '{{ csrf_token }}';
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+}
 
 fetch(`/api/batches/?product={{ product.id }}`)
   .then(r => r.json())
@@ -217,12 +272,86 @@ function renderBatches(container, batchList) {
   container.innerHTML = batchList.map(b => `
     <div class="batch-item d-flex justify-content-between align-items-center">
       <div>
-        <strong class="small">#${b.batch_code.substring(0, 8)}</strong>
-        <span class="small text-muted ms-2">数量: ${b.quantity}${b.harvest_date ? ' | 收获: ' + b.harvest_date : ''}</span>
+        <strong class="small">#${escapeHtml(b.batch_code).substring(0, 8)}</strong>
+        <span class="small text-muted ms-2">数量: ${escapeHtml(b.quantity)}${b.harvest_date ? ' | 收获: ' + escapeHtml(b.harvest_date) : ''}</span>
       </div>
-      <a href="/trace/${b.batch_code}/" class="btn btn-sm btn-outline-success"><i class="bi bi-search"></i> 溯源</a>
+      <a href="/trace/${encodeURIComponent(b.batch_code)}/" class="btn btn-sm btn-outline-success"><i class="bi bi-search"></i> 溯源</a>
     </div>
   `).join('');
 }
+
+function renderReviews(reviews) {
+  const list = document.getElementById('reviews-list');
+  if (!reviews.length) {
+    list.innerHTML = '<p class="small text-muted mb-0">暂无评价</p>';
+    return;
+  }
+  list.innerHTML = reviews.map(r => {
+    const rating = Math.max(1, Math.min(5, Number(r.rating || 5)));
+    return `
+      <div class="review-item">
+        <div class="d-flex justify-content-between">
+          <strong>${escapeHtml(r.buyer)}</strong>
+          <span class="review-stars">${'★'.repeat(rating)}${'☆'.repeat(5 - rating)}</span>
+        </div>
+        <p class="mb-1 small">${escapeHtml(r.comment || '用户未填写文字评价')}</p>
+        <span class="small text-muted">${escapeHtml(r.created_at)}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function loadReviews() {
+  fetch(`/api/products/{{ product.id }}/reviews/`)
+    .then(r => r.json())
+    .then(renderReviews)
+    .catch(() => {
+      document.getElementById('reviews-list').innerHTML = '<p class="small text-muted mb-0">评价加载失败</p>';
+    });
+}
+
+loadReviews();
+
+if (IS_AUTHENTICATED) {
+  document.getElementById('review-form-container').classList.remove('d-none');
+}
+
+document.querySelectorAll('.star-rating .star').forEach(star => {
+  star.addEventListener('click', () => {
+    const value = Number(star.dataset.value);
+    document.getElementById('review-rating').value = value;
+    document.querySelectorAll('.star-rating .star').forEach(s => {
+      s.classList.toggle('active', Number(s.dataset.value) <= value);
+    });
+  });
+});
+
+document.getElementById('review-form').addEventListener('submit', event => {
+  event.preventDefault();
+  const msg = document.getElementById('review-msg');
+  fetch(`/api/products/{{ product.id }}/reviews/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': CSRF_TOKEN
+    },
+    body: JSON.stringify({
+      rating: document.getElementById('review-rating').value,
+      comment: document.getElementById('review-comment').value
+    })
+  })
+    .then(async response => {
+      const data = await response.json();
+      if (!response.ok) throw data;
+      msg.className = 'small ms-2 text-success';
+      msg.textContent = '评价已提交';
+      document.getElementById('review-comment').value = '';
+      loadReviews();
+    })
+    .catch(error => {
+      msg.className = 'small ms-2 text-danger';
+      msg.textContent = error.detail || '提交失败';
+    });
+});
 </script>
 {% endblock %}

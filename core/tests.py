@@ -1,12 +1,17 @@
 """助农平台单元测试"""
 import json
+import shutil
+import tempfile
 from django.test import TestCase, Client
+from django.test import override_settings
 from django.urls import reverse
 from django.contrib.auth.models import User
 from rest_framework import status
 from .models import Cooperative, FarmerProfile, Product, ProductBatch, Order, OrderItem
 
+TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix='agro-test-media-')
 
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
 class ModelTests(TestCase):
     """数据模型测试"""
 
@@ -80,6 +85,7 @@ class ModelTests(TestCase):
         self.assertEqual(order.total_amount, 30.00)
 
 
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
 class AuthTests(TestCase):
     """认证功能测试"""
 
@@ -135,6 +141,7 @@ class AuthTests(TestCase):
         self.assertTrue(User.objects.filter(username='newuser').exists())
 
 
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
 class PageViewTests(TestCase):
     """前端页面访问测试"""
 
@@ -182,12 +189,14 @@ class PageViewTests(TestCase):
         self.assertContains(response, str(self.batch.batch_code)[:8])
 
 
+@override_settings(MEDIA_ROOT=TEST_MEDIA_ROOT)
 class APITests(TestCase):
     """REST API 测试"""
 
     def setUp(self):
         self.client = Client()
         self.user = User.objects.create_user('apiuser', 'api@test.com', 'apipass123')
+        self.buyer = User.objects.create_user('buyeruser', 'buyer@test.com', 'buyerpass123')
         self.coop = Cooperative.objects.create(name='API测试合作社', region='测试区')
         self.farmer = FarmerProfile.objects.create(
             user=self.user, cooperative=self.coop,
@@ -230,10 +239,9 @@ class APITests(TestCase):
 
     def test_create_order_authenticated(self):
         """测试已认证用户创建订单"""
-        self.client.login(username='apiuser', password='apipass123')
+        self.client.login(username='buyeruser', password='buyerpass123')
         batch = ProductBatch.objects.create(product=self.product, quantity=10)
         response = self.client.post('/api/orders/', {
-            'buyer': self.user.pk,
             'address': '测试收货地址',
             'items': [{
                 'product_batch': batch.pk,
@@ -243,3 +251,7 @@ class APITests(TestCase):
         }, content_type='application/json')
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.json()['total_amount'], '50.00')
+
+
+def tearDownModule():
+    shutil.rmtree(TEST_MEDIA_ROOT, ignore_errors=True)

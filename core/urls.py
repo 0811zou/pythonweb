@@ -9,11 +9,13 @@ from .views import (
     dashboard_stats, dashboard_view,
     demand_analysis, market_analysis_view,
     product_filter_options,
+    province_products, province_map_view,
     farmer_dashboard, farmer_product_create,
     farmer_product_edit, farmer_product_delete, farmer_product_submit,
     farmer_orders_view,
     admin_dashboard, admin_products, admin_product_review, admin_users,
     order_create_view, consumer_orders_view,
+    product_reviews,
 )
 
 router = routers.DefaultRouter()
@@ -34,11 +36,14 @@ urlpatterns = [
     path('accounts/login/', login_view, name='login'),
     path('accounts/logout/', logout_view, name='logout'),
     path('accounts/register/', register_view, name='register'),
+    path('api/products/<int:pk>/reviews/', product_reviews, name='product_reviews'),
     path('api/products/filter-options/', product_filter_options, name='product_filter_options'),
     path('api/', include(router.urls)),
     path('api/stats/dashboard/', dashboard_stats, name='dashboard_stats'),
+    path('api/stats/province-products/', province_products, name='province_products'),
     path('api/analysis/demand/', demand_analysis, name='demand_analysis'),
     path('dashboard/', dashboard_view, name='dashboard'),
+    path('map/', province_map_view, name='province_map'),
     # 消费者端
     path('order/create/', order_create_view, name='order_create'),
     path('orders/', consumer_orders_view, name='consumer_orders'),

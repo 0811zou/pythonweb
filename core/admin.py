@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Cooperative, FarmerProfile, Product, ProductBatch, Order, OrderItem, SubsidyApplication, Training, Review, LogisticsEvent
+from .models import Cooperative, FarmerProfile, Product, ProductBatch, Order, OrderItem, SubsidyApplication, Training, Review, LogisticsEvent, TraceEvent
 
 @admin.register(Cooperative)
 class CooperativeAdmin(admin.ModelAdmin):
@@ -15,7 +15,12 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(ProductBatch)
 class ProductBatchAdmin(admin.ModelAdmin):
-    list_display = ('product','batch_code','harvest_date','quantity')
+    list_display = ('product','batch_code','harvest_date','quantity','qr_code')
+
+@admin.register(TraceEvent)
+class TraceEventAdmin(admin.ModelAdmin):
+    list_display = ('batch','event_type','title','occurred_at','data_hash')
+    readonly_fields = ('previous_hash','data_hash','created_at')
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):

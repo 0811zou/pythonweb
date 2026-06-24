@@ -50,8 +50,15 @@
                   <td class="small">{{ p.created_at|date:'Y-m-d H:i' }}</td>
                   <td>
                     {% if p.status == 'pending' %}
-                      <a href="{% url 'admin_product_review' p.pk 'approve' %}" class="btn btn-sm btn-success" onclick="return confirm('通过「{{ p.name }}」的审核？')"><i class="bi bi-check-lg"></i> 通过</a>
-                      <button class="btn btn-sm btn-danger" onclick="rejectProduct({{ p.pk }}, '{{ p.name }}')"><i class="bi bi-x-lg"></i> 拒绝</button>
+                      <form method="post" action="{% url 'admin_product_review' p.pk 'approve' %}" class="d-inline" onsubmit="return confirm('通过「{{ p.name }}」的审核？')">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i> 通过</button>
+                      </form>
+                      <form method="post" action="{% url 'admin_product_review' p.pk 'reject' %}" class="d-inline-flex gap-1 mt-1 mt-lg-0">
+                        {% csrf_token %}
+                        <input type="text" name="note" class="form-control form-control-sm" placeholder="拒绝原因" style="max-width:160px;" required>
+                        <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-x-lg"></i> 拒绝</button>
+                      </form>
                     {% else %}
                       <span class="text-muted small">{{ p.review_note|default:'-' }}</span>
                     {% endif %}
@@ -68,12 +75,4 @@
     </div>
   </div>
 </div>
-<script>
-function rejectProduct(pk, name) {
-  const note = prompt(`输入拒绝「${name}」的原因：`, '信息不完整，请补充');
-  if (note !== null) {
-    window.location.href = `/manage/products/${pk}/reject/?note=${encodeURIComponent(note)}`;
-  }
-}
-</script>
 {% endblock %}

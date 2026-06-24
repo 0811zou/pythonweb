@@ -118,6 +118,16 @@
 
 {% block extra_scripts %}
 <script>
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+}
+
 function initChart(id) {
   const dom = document.getElementById(id);
   if (!dom) return null;
@@ -220,9 +230,9 @@ fetch('/api/analysis/demand/')
         const tr = document.createElement('tr');
         const st = getSupplyStatus(d);
         tr.innerHTML = `
-          <td><strong>${d.product}</strong></td>
-          <td>${d.sold}</td>
-          <td>${d.available}</td>
+          <td><strong>${escapeHtml(d.product)}</strong></td>
+          <td>${escapeHtml(d.sold)}</td>
+          <td>${escapeHtml(d.available)}</td>
           <td><span class="badge ${st.cls}"><i class="bi bi-${st.icon}"></i> ${st.text}</span></td>`;
         tbody.appendChild(tr);
       });

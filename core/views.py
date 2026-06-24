@@ -1,25 +1,48 @@
 from rest_framework import viewsets, permissions, status
-from rest_framework.decorators import action, api_view
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
+from drf_spectacular.utils import extend_schema
+from drf_spectacular.types import OpenApiTypes
 from django.shortcuts import get_object_or_404, render, redirect, reverse
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib import messages
-from django.db.models import Count, Sum, Q
+from django.db import transaction
+from django.db.models import Count, Sum, Q, F, DecimalField, ExpressionWrapper
 from django.db.models.functions import TruncMonth
-from .models import Product, ProductBatch, Order, OrderItem, SubsidyApplication, Training, FarmerProfile, Cooperative, Review
+from decimal import Decimal, InvalidOperation
+from functools import wraps
+from .models import Product, ProductBatch, Order, OrderItem, SubsidyApplication, Training, FarmerProfile, Cooperative, Review, TraceEvent
+from .permissions import IsAdminOrReadOnly, IsFarmerOwnerOrAdmin, IsOrderParticipantOrAdmin, IsSubsidyOwnerOrAdmin, get_farmer_profile
 from .serializers import ProductSerializer, ProductBatchSerializer, OrderSerializer, SubsidyApplicationSerializer, TrainingSerializer
 from .llm_service import generate_analysis
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.select_related('farmer').prefetch_related('batches').filter(status='approved')
+    queryset = Product.objects.select_related('farmer__user', 'farmer__cooperative').prefetch_related('batches').all()
     serializer_class = ProductSerializer
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+    permission_classes = [IsFarmerOwnerOrAdmin]
     ordering = ['-created_at']
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = super().get_queryset().order_by('-created_at')
+        farmer = get_farmer_profile(self.request.user)
+
+        if self.request.method in permissions.SAFE_METHODS:
+            if self.request.user.is_authenticated and self.request.user.is_staff:
+                pass
+            elif self.request.query_params.get('mine') == '1' and farmer:
+                qs = qs.filter(farmer=farmer)
+            else:
+                qs = qs.filter(status='approved')
+        elif self.request.user.is_staff:
+            pass
+        elif farmer:
+            qs = qs.filter(farmer=farmer)
+        else:
+            return Product.objects.none()
+
         category = self.request.query_params.get('category')
         variety = self.request.query_params.get('variety')
         origin = self.request.query_params.get('origin')
@@ -34,10 +57,161 @@ class ProductViewSet(viewsets.ModelViewSet):
             qs = qs.filter(Q(name__icontains=search) | Q(description__icontains=search))
         return qs
 
+    def perform_create(self, serializer):
+        farmer = get_farmer_profile(self.request.user)
+        if self.request.user.is_staff:
+            raise PermissionDenied('管理员请在后台为指定农户创建产品')
+        elif farmer:
+            serializer.save(farmer=farmer, status='pending')
+        else:
+            raise PermissionDenied('只有农户可以发布产品')
 
+    def perform_update(self, serializer):
+        product = self.get_object()
+        next_status = product.status
+        if not self.request.user.is_staff and product.status in ('approved', 'pending'):
+            next_status = 'pending'
+        serializer.save(status=next_status)
+
+
+# ===== 省份提取工具 =====
+CHINA_PROVINCES = [
+    '北京市', '天津市', '上海市', '重庆市',
+    '河北省', '山西省', '辽宁省', '吉林省', '黑龙江省',
+    '江苏省', '浙江省', '安徽省', '福建省', '江西省', '山东省', '河南省',
+    '湖北省', '湖南省', '广东省', '海南省',
+    '四川省', '贵州省', '云南省', '陕西省', '甘肃省', '青海省', '台湾省',
+    '内蒙古自治区', '广西壮族自治区', '西藏自治区', '宁夏回族自治区', '新疆维吾尔自治区',
+    '香港特别行政区', '澳门特别行政区',
+]
+
+def extract_province(address):
+    """从地址字符串中提取省份名称"""
+    if not address:
+        return None
+    for prov in sorted(CHINA_PROVINCES, key=len, reverse=True):
+        if address.startswith(prov):
+            return prov
+    short_map = {'新疆': '新疆维吾尔自治区', '西藏': '西藏自治区', '内蒙古': '内蒙古自治区', '广西': '广西壮族自治区', '宁夏': '宁夏回族自治区'}
+    for short, full in short_map.items():
+        if address.startswith(short):
+            return full
+    return None
+
+
+@extend_schema(responses=OpenApiTypes.OBJECT)
+@api_view(['GET'])
+def province_products(request):
+    """按省份统计产品分布"""
+    products = Product.objects.filter(status='approved').select_related('farmer__user')
+    farmer_agg = (
+        products.values('farmer__address', 'farmer__user__username')
+        .annotate(product_count=Count('id'))
+        .order_by()
+    )
+    province_counts = {}
+    province_detail = {}
+    for fp in farmer_agg:
+        prov = extract_province(fp['farmer__address']) or '其他'
+        province_counts[prov] = province_counts.get(prov, 0) + fp['product_count']
+        if prov not in province_detail:
+            province_detail[prov] = {'product_count': 0, 'farmers': [], 'products': []}
+        province_detail[prov]['product_count'] += fp['product_count']
+        farmer_name = fp['farmer__user__username']
+        if farmer_name not in province_detail[prov]['farmers']:
+            province_detail[prov]['farmers'].append(farmer_name)
+    for p in products.iterator():
+        prov = extract_province(p.farmer.address) or '其他'
+        province_detail[prov]['products'].append({
+            'id': p.id,
+            'name': p.name,
+            'category': p.category or '未分类',
+            'price': str(p.price),
+            'unit': p.unit,
+            'image_url': request.build_absolute_uri(p.image.url) if p.image else None,
+            'farmer': p.farmer.user.username,
+        })
+    map_data = [{'name': k, 'value': v} for k, v in sorted(province_counts.items())]
+    return Response({'map_data': map_data, 'provinces': province_detail})
+
+
+def province_map_view(request):
+    """中国地图产品分布页面"""
+    return render(request, 'map.html')
+
+
+# ===== 产品评价 API =====
+
+@extend_schema(methods=['GET'], responses=OpenApiTypes.OBJECT)
+@extend_schema(methods=['POST'], request=OpenApiTypes.OBJECT, responses=OpenApiTypes.OBJECT)
+@api_view(['GET', 'POST'])
+def product_reviews(request, pk):
+    """获取/提交产品评价"""
+    product = get_object_or_404(Product, pk=pk)
+
+    if request.method == 'GET':
+        reviews = Review.objects.filter(product=product).select_related('buyer').order_by('-created_at')[:20]
+        return Response([{
+            'id': r.id,
+            'buyer': r.buyer.username,
+            'rating': r.rating,
+            'comment': r.comment,
+            'created_at': r.created_at.strftime('%Y-%m-%d'),
+        } for r in reviews])
+
+    # POST — 提交评价
+    if not request.user.is_authenticated:
+        return Response({'detail': '请先登录'}, status=401)
+
+    try:
+        rating = int(request.data.get('rating'))
+    except (TypeError, ValueError):
+        return Response({'detail': '评分需为1-5的整数'}, status=400)
+    comment = str(request.data.get('comment', '')).strip()[:500]
+    if rating < 1 or rating > 5:
+        return Response({'detail': '评分需为1-5的整数'}, status=400)
+
+    # 找用户的已完成订单中是否包含该产品
+    has_purchased = OrderItem.objects.filter(
+        order__buyer=request.user,
+        order__status='delivered',
+        product_batch__product=product,
+    ).exists()
+    if not has_purchased:
+        return Response({'detail': '您尚未购买该产品，无法评价'}, status=403)
+
+    # 检查是否已评过
+    if Review.objects.filter(buyer=request.user, product=product).exists():
+        return Response({'detail': '您已评价过该产品'}, status=400)
+
+    # 找到这笔订单
+    order_item = OrderItem.objects.filter(
+        order__buyer=request.user,
+        order__status='delivered',
+        product_batch__product=product,
+    ).select_related('order').latest('order__updated_at')
+    order = order_item.order
+
+    review = Review.objects.create(
+        order=order,
+        buyer=request.user,
+        farmer=product.farmer,
+        product=product,
+        rating=rating,
+        comment=comment,
+    )
+    return Response({
+        'id': review.id,
+        'buyer': review.buyer.username,
+        'rating': review.rating,
+        'comment': review.comment,
+        'created_at': review.created_at.strftime('%Y-%m-%d'),
+    }, status=201)
+
+
+@extend_schema(responses=OpenApiTypes.OBJECT)
 @api_view(['GET'])
 def product_filter_options(request):
-    """返回可用的筛选选项（分类、品种、产地）"""
     categories = (
         Product.objects.filter(status='approved')
         .values('category')
@@ -75,30 +249,68 @@ def product_filter_options(request):
 
 
 class ProductBatchViewSet(viewsets.ModelViewSet):
-    queryset = ProductBatch.objects.select_related('product').all()
+    queryset = ProductBatch.objects.select_related('product__farmer__user').prefetch_related('events').all()
     serializer_class = ProductBatchSerializer
+    permission_classes = [IsFarmerOwnerOrAdmin]
 
     def get_queryset(self):
-        qs = super().get_queryset()
+        qs = super().get_queryset().order_by('-created_at')
+        farmer = get_farmer_profile(self.request.user)
+        if self.request.method in permissions.SAFE_METHODS:
+            if self.request.user.is_authenticated and self.request.user.is_staff:
+                pass
+            elif self.request.query_params.get('mine') == '1' and farmer:
+                qs = qs.filter(product__farmer=farmer)
+            else:
+                qs = qs.filter(product__status='approved')
+        elif self.request.user.is_staff:
+            pass
+        elif farmer:
+            qs = qs.filter(product__farmer=farmer)
+        else:
+            return ProductBatch.objects.none()
         product_id = self.request.query_params.get('product')
         if product_id:
             qs = qs.filter(product_id=product_id)
         return qs
 
+    def perform_create(self, serializer):
+        product = serializer.validated_data['product']
+        farmer = get_farmer_profile(self.request.user)
+        if not self.request.user.is_staff and product.farmer != farmer:
+            raise PermissionDenied('只能为自己的产品创建批次')
+        serializer.save()
+
 class OrderViewSet(viewsets.ModelViewSet):
-    queryset = Order.objects.prefetch_related('items').all()
+    queryset = Order.objects.prefetch_related('items__product_batch__product').select_related('buyer').all()
     serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        qs = super().get_queryset().order_by('-created_at')
+        if self.request.user.is_staff:
+            return qs
+        farmer = get_farmer_profile(self.request.user)
+        if farmer:
+            return qs.filter(items__product_batch__product__farmer=farmer).distinct()
+        return qs.filter(buyer=self.request.user)
+
+    def get_permissions(self):
+        if self.action in ('retrieve', 'update', 'partial_update', 'destroy', 'upload_payment'):
+            return [permissions.IsAuthenticated(), IsOrderParticipantOrAdmin()]
+        return super().get_permissions()
 
     @action(detail=True, methods=['post'])
     def upload_payment(self, request, pk=None):
         order = self.get_object()
+        if order.buyer_id != request.user.id and not request.user.is_staff:
+            return Response({'detail':'只能为自己的订单上传付款凭证'}, status=status.HTTP_403_FORBIDDEN)
         proof = request.data.get('payment_proof')
         if not proof:
             return Response({'detail':'请上传付款凭证'}, status=status.HTTP_400_BAD_REQUEST)
-        order.payment_proof = proof
+        order.payment_proof = str(proof)[:500]
         order.status = 'paid_offline'
-        order.save()
+        order.save(update_fields=['payment_proof', 'status', 'updated_at'])
         return Response({'detail':'已上传，等待后台确认'})
 
 class SubsidyViewSet(viewsets.ModelViewSet):
@@ -106,14 +318,39 @@ class SubsidyViewSet(viewsets.ModelViewSet):
     serializer_class = SubsidyApplicationSerializer
     permission_classes = [permissions.IsAuthenticated]
 
+    def get_queryset(self):
+        qs = super().get_queryset().order_by('-submitted_at')
+        if self.request.user.is_staff:
+            return qs
+        farmer = get_farmer_profile(self.request.user)
+        if farmer:
+            return qs.filter(farmer=farmer)
+        return SubsidyApplication.objects.none()
+
+    def get_permissions(self):
+        if self.action in ('retrieve', 'update', 'partial_update', 'destroy'):
+            return [permissions.IsAuthenticated(), IsSubsidyOwnerOrAdmin()]
+        return super().get_permissions()
+
+    def perform_create(self, serializer):
+        farmer = get_farmer_profile(self.request.user)
+        if not farmer:
+            raise PermissionDenied('只有农户可以申请补贴')
+        serializer.save(farmer=farmer)
+
 class TrainingViewSet(viewsets.ModelViewSet):
     queryset = Training.objects.all()
     serializer_class = TrainingSerializer
+    permission_classes = [IsAdminOrReadOnly]
 
 # 溯源页面
 def trace_view(request, batch_code):
-    batch = get_object_or_404(ProductBatch, batch_code=batch_code)
-    return render(request, 'trace.html', {'batch': batch})
+    batch = get_object_or_404(
+        ProductBatch.objects.select_related('product__farmer__user').prefetch_related('events'),
+        batch_code=batch_code,
+    )
+    batch.ensure_qr_code()
+    return render(request, 'trace.html', {'batch': batch, 'events': batch.events.all()})
 
 
 # ===== 前端页面 =====
@@ -132,6 +369,8 @@ def product_batches_view(request, pk):
     """产品批次列表页"""
     product = get_object_or_404(Product.objects.select_related('farmer__user'), pk=pk)
     batches = ProductBatch.objects.filter(product=product).order_by('-created_at')
+    for batch in batches:
+        batch.ensure_qr_code()
     return render(request, 'product_batches.html', {'product': product, 'batches': batches})
 
 def trace_query_view(request):
@@ -164,7 +403,7 @@ def login_view(request):
             try:
                 user.farmerprofile
                 return redirect('farmer_dashboard')
-            except:
+            except FarmerProfile.DoesNotExist:
                 return redirect('product_list')
     else:
         form = AuthenticationForm()
@@ -198,13 +437,15 @@ def register_view(request):
 
 # ===== 数据统计与可视化 =====
 
+@extend_schema(responses=OpenApiTypes.OBJECT)
 @api_view(['GET'])
 def dashboard_stats(request):
     """数据驾驶舱 — 根据角色返回不同数据"""
     is_staff = request.user.is_authenticated and request.user.is_staff
+    product_scope = Product.objects.all() if is_staff else Product.objects.filter(status='approved')
 
     # 基础数据（所有人可见）
-    total_products = Product.objects.count()
+    total_products = product_scope.count()
     total_farmers = FarmerProfile.objects.count()
     total_orders = Order.objects.filter(status='delivered').count()
 
@@ -219,7 +460,7 @@ def dashboard_stats(request):
 
     # 产品分类分布
     category_dist = (
-        Product.objects.values('category')
+        product_scope.values('category')
         .annotate(count=Count('id'))
         .order_by('-count')
     )
@@ -263,29 +504,44 @@ def dashboard_view(request):
 
 # ===== 智能供需分析 =====
 
+@extend_schema(responses=OpenApiTypes.OBJECT)
 @api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
 def demand_analysis(request):
     """需求分析 API — 分析产品卖往哪些地区、什么产品需求大"""
-    # 1. 各地区需求排行（排除已取消订单，统计所有有效需求）
-    regional_demand = (
-        OrderItem.objects
-        .exclude(order__status='cancelled')
+    sales_value = ExpressionWrapper(
+        F('price') * F('quantity'),
+        output_field=DecimalField(max_digits=12, decimal_places=2),
+    )
+    valid_items = OrderItem.objects.exclude(order__status='cancelled')
+
+    # 1. 各产品需求排行（排除已取消订单，统计所有有效需求）
+    product_demand = (
+        valid_items
         .values('product_batch__product__name')
         .annotate(
             total_qty=Sum('quantity'),
-            total_revenue=Sum('price')
+            total_revenue=Sum(sales_value)
         )
-        .order_by('-total_qty')[:10]
+        .order_by('-total_qty')
     )
+    regional_demand = product_demand[:10]
 
     # 2. 各产品供需情况（遍历所有有批次的产品，含销量为0的）
-    sold_map = {item['product_batch__product__name']: item['total_qty'] for item in regional_demand}
+    available_map = dict(
+        ProductBatch.objects.values('product__name')
+        .annotate(total=Sum('quantity'))
+        .values_list('product__name', 'total')
+    )
+    sold_map = {
+        item['product_batch__product__name']: item['total_qty'] or 0
+        for item in product_demand
+    }
+    all_product_names = set(list(available_map.keys()) + list(sold_map.keys()))
     product_supply_demand = []
-    for pname in ProductBatch.objects.values_list('product__name', flat=True).distinct():
+    for pname in all_product_names:
         sold = sold_map.get(pname, 0)
-        available = ProductBatch.objects.filter(
-            product__name=pname
-        ).aggregate(total=Sum('quantity'))['total'] or 0
+        available = available_map.get(pname, 0) or 0
         product_supply_demand.append({
             'product': pname,
             'sold': sold,
@@ -295,14 +551,20 @@ def demand_analysis(request):
         })
     product_supply_demand.sort(key=lambda x: x['sold'], reverse=True)
 
-    # 3. 地区分布（排除已取消）
-    region_stats = (
+    # 3. 地区分布只展示粗粒度省份，避免暴露完整收货地址
+    region_map = {}
+    valid_orders = (
         Order.objects
         .exclude(status='cancelled')
-        .values('address')
-        .annotate(order_count=Count('id'), total=Sum('total_amount'))
-        .order_by('-order_count')[:8]
+        .values('address', 'total_amount')
     )
+    for order in valid_orders:
+        region = extract_province(order['address']) or '其他'
+        if region not in region_map:
+            region_map[region] = {'region': region, 'orders': 0, 'total': Decimal('0')}
+        region_map[region]['orders'] += 1
+        region_map[region]['total'] += order['total_amount'] or Decimal('0')
+    region_stats = sorted(region_map.values(), key=lambda x: x['orders'], reverse=True)[:8]
 
     # 4. AI 分析简报（优先调本地 Ollama 大模型，不可用时回退规则引擎）
     llm_input = {
@@ -312,7 +574,7 @@ def demand_analysis(request):
             for r in regional_demand
         ],
         'region_stats': [
-            {'region': r['address'][:6], 'orders': r['order_count'], 'total': float(r['total'] or 0)}
+            {'region': r['region'], 'orders': r['orders'], 'total': float(r['total'] or 0)}
             for r in region_stats
         ],
     }
@@ -337,28 +599,45 @@ def order_create_view(request):
         request.user.farmerprofile
         messages.warning(request, '农户账号无法下单')
         return redirect('farmer_dashboard')
-    except:
+    except FarmerProfile.DoesNotExist:
         pass
 
     product_id = request.GET.get('product') or request.POST.get('product_id')
     product = get_object_or_404(Product, pk=product_id, status='approved')
 
     if request.method == 'POST':
-        quantity = int(request.POST.get('quantity', 1))
+        try:
+            quantity = int(request.POST.get('quantity', 1))
+        except (TypeError, ValueError):
+            return render(request, 'order_create.html', {'product': product, 'error': '数量必须为整数'})
         address = request.POST.get('address', '').strip()
         if not address:
             return render(request, 'order_create.html', {'product': product, 'error': '请填写收货地址'})
-        total = float(product.price) * quantity
-        order = Order.objects.create(
-            buyer=request.user,
-            total_amount=total,
-            status='pending',
-            address=address,
-        )
-        # 找一个可用批次
-        batch = ProductBatch.objects.filter(product=product).first()
-        if batch:
-            OrderItem.objects.create(order=order, product_batch=batch, quantity=quantity, price=product.price)
+        if quantity <= 0:
+            return render(request, 'order_create.html', {'product': product, 'error': '数量必须大于0'})
+        try:
+            with transaction.atomic():
+                batch = (
+                    ProductBatch.objects
+                    .select_for_update()
+                    .filter(product=product, quantity__gte=quantity)
+                    .order_by('harvest_date', 'created_at')
+                    .first()
+                )
+                if not batch:
+                    return render(request, 'order_create.html', {'product': product, 'error': '库存不足'})
+                total = product.price * Decimal(quantity)
+                order = Order.objects.create(
+                    buyer=request.user,
+                    total_amount=total,
+                    status='pending',
+                    address=address,
+                )
+                OrderItem.objects.create(order=order, product_batch=batch, quantity=quantity, price=product.price)
+                batch.quantity -= quantity
+                batch.save(update_fields=['quantity'])
+        except (InvalidOperation, ValueError):
+            return render(request, 'order_create.html', {'product': product, 'error': '订单金额计算失败'})
         messages.success(request, f'下单成功！订单编号 #{order.id}')
         return redirect('product_detail', pk=product.id)
 
@@ -387,6 +666,7 @@ def consumer_orders_view(request):
 
 def farmer_required(view_func):
     """装饰器：检查用户是否为农户"""
+    @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
             return redirect('login')
@@ -441,15 +721,19 @@ def farmer_product_create(request):
         description = request.POST.get('description', '').strip()
         price = request.POST.get('price', '0')
         unit = request.POST.get('unit', 'kg')
+        try:
+            price_value = Decimal(price)
+        except (InvalidOperation, TypeError):
+            price_value = Decimal('0')
         if not name:
             messages.error(request, '请输入产品名称')
-        elif not price or float(price) <= 0:
+        elif price_value <= 0:
             messages.error(request, '请输入有效的价格')
         else:
             product = Product.objects.create(
                 farmer=profile, name=name, category=category,
                 variety=variety, description=description,
-                price=price, unit=unit, status='pending'
+                price=price_value, unit=unit, status='pending'
             )
             if request.FILES.get('image'):
                 product.image = request.FILES['image']
@@ -468,11 +752,20 @@ def farmer_product_edit(request, pk):
         messages.warning(request, '只能编辑草稿或未通过审核的产品')
         return redirect('farmer_products')
     if request.method == 'POST':
+        price = request.POST.get('price', product.price)
+        try:
+            price_value = Decimal(price)
+        except (InvalidOperation, TypeError):
+            messages.error(request, '请输入有效的价格')
+            return render(request, 'farmer/product_form.html', {'product': product, 'action': '编辑'})
+        if price_value <= 0:
+            messages.error(request, '请输入有效的价格')
+            return render(request, 'farmer/product_form.html', {'product': product, 'action': '编辑'})
         product.name = request.POST.get('name', product.name)
         product.category = request.POST.get('category', '')
         product.variety = request.POST.get('variety', '')
         product.description = request.POST.get('description', '')
-        product.price = request.POST.get('price', product.price)
+        product.price = price_value
         product.unit = request.POST.get('unit', 'kg')
         if request.FILES.get('image'):
             product.image = request.FILES['image']
@@ -490,6 +783,9 @@ def farmer_product_edit(request, pk):
 @farmer_required
 def farmer_product_delete(request, pk):
     """农户下架/删除产品"""
+    if request.method != 'POST':
+        messages.error(request, '请通过页面按钮删除产品')
+        return redirect('farmer_products')
     profile = request.farmer_profile
     product = get_object_or_404(Product, pk=pk, farmer=profile)
     product.delete()
@@ -500,6 +796,9 @@ def farmer_product_delete(request, pk):
 @farmer_required
 def farmer_product_submit(request, pk):
     """农户提交审核"""
+    if request.method != 'POST':
+        messages.error(request, '请通过页面按钮提交审核')
+        return redirect('farmer_products')
     profile = request.farmer_profile
     product = get_object_or_404(Product, pk=pk, farmer=profile)
     if product.status == 'draft':
@@ -513,8 +812,9 @@ def farmer_product_submit(request, pk):
 
 def admin_required(view_func):
     """装饰器：检查是否为管理员"""
+    @wraps(view_func)
     def wrapper(request, *args, **kwargs):
-        if not request.user.is_staff:
+        if not request.user.is_authenticated or not request.user.is_staff:
             messages.error(request, '无权限')
             return redirect('/')
         return view_func(request, *args, **kwargs)
@@ -555,17 +855,23 @@ def admin_products(request):
 @admin_required
 def admin_product_review(request, pk, action):
     """管理端 — 审核操作"""
+    if request.method != 'POST':
+        messages.error(request, '审核操作请通过页面按钮提交')
+        return redirect('admin_products')
     product = get_object_or_404(Product, pk=pk)
     if action == 'approve':
         product.status = 'approved'
-        product.review_note = request.GET.get('note', '审核通过')
+        product.review_note = request.POST.get('note', '审核通过')
         messages.success(request, f'「{product.name}」已通过审核')
     elif action == 'reject':
-        note = request.GET.get('note', '')
+        note = request.POST.get('note', '').strip()
         product.status = 'rejected'
         product.review_note = note
         messages.warning(request, f'「{product.name}」未通过审核')
-    product.save()
+    else:
+        messages.error(request, '未知审核操作')
+        return redirect('admin_products')
+    product.save(update_fields=['status', 'review_note'])
     return redirect('admin_products')
 
 

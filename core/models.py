@@ -1,12 +1,19 @@
-from django.db import models
-from django.contrib.auth.models import User
+import hashlib
+import json
 import secrets
-from datetime import datetime
+from io import BytesIO
+
+from django.conf import settings
+from django.core.files.base import ContentFile
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.contrib.auth.models import User
+from django.db import models
+from django.utils import timezone
 
 
 def generate_batch_code():
     """生成可读批次编号：B-20260529-A3F2X7K9"""
-    date_part = datetime.now().strftime('%Y%m%d')
+    date_part = timezone.now().strftime('%Y%m%d')
     rand_part = secrets.token_hex(4).upper()
     return f'B-{date_part}-{rand_part}'
 
@@ -63,10 +70,91 @@ class ProductBatch(models.Model):
     images = models.JSONField(default=list, blank=True)
     trace_info = models.JSONField(default=dict, blank=True)
     qc_report = models.CharField(max_length=500, blank=True)
+    qr_code = models.ImageField(upload_to='qrcodes/', blank=True, null=True, help_text='溯源二维码')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.product.name} #{self.batch_code}"
+
+    @property
+    def trace_url(self):
+        base_url = getattr(settings, 'SITE_BASE_URL', '').rstrip('/')
+        path = f"/trace/{self.batch_code}/"
+        return f"{base_url}{path}" if base_url else path
+
+    def save(self, *args, **kwargs):
+        is_new = self._state.adding
+        super().save(*args, **kwargs)
+        if is_new:
+            self.ensure_qr_code()
+
+    def ensure_qr_code(self):
+        if self.qr_code:
+            return
+        import qrcode
+
+        img = qrcode.make(self.trace_url)
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        filename = f"{self.batch_code}.png"
+        self.qr_code.save(filename, ContentFile(buffer.getvalue()), save=False)
+        super().save(update_fields=['qr_code'])
+
+
+class TraceEvent(models.Model):
+    EVENT_TYPES = [
+        ('planting', '种植'),
+        ('fertilizing', '施肥'),
+        ('pesticide', '农药'),
+        ('harvest', '采收'),
+        ('qc', '质检'),
+        ('storage', '入库'),
+        ('shipping', '发货'),
+        ('other', '其他'),
+    ]
+    batch = models.ForeignKey(ProductBatch, on_delete=models.CASCADE, related_name='events')
+    event_type = models.CharField(max_length=30, choices=EVENT_TYPES, default='other')
+    title = models.CharField(max_length=120)
+    description = models.TextField(blank=True)
+    operator = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    occurred_at = models.DateTimeField(default=timezone.now)
+    location = models.CharField(max_length=200, blank=True)
+    previous_hash = models.CharField(max_length=64, blank=True)
+    data_hash = models.CharField(max_length=64, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['occurred_at', 'created_at']
+
+    def __str__(self):
+        return f"{self.batch.batch_code} - {self.title}"
+
+    def save(self, *args, **kwargs):
+        if not self.previous_hash:
+            previous = (
+                TraceEvent.objects
+                .filter(batch=self.batch)
+                .exclude(pk=self.pk)
+                .order_by('-created_at', '-id')
+                .first()
+            )
+            self.previous_hash = previous.data_hash if previous else ''
+        self.data_hash = self.calculate_hash()
+        super().save(*args, **kwargs)
+
+    def calculate_hash(self):
+        payload = {
+            'batch_code': self.batch.batch_code,
+            'event_type': self.event_type,
+            'title': self.title,
+            'description': self.description,
+            'operator_id': self.operator_id,
+            'occurred_at': self.occurred_at.isoformat() if self.occurred_at else '',
+            'location': self.location,
+            'previous_hash': self.previous_hash,
+        }
+        raw = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        return hashlib.sha256(raw.encode('utf-8')).hexdigest()
 
 class Order(models.Model):
     STATUS_CHOICES = [
@@ -112,9 +200,11 @@ class Review(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE)
     buyer = models.ForeignKey(User, on_delete=models.CASCADE)
     farmer = models.ForeignKey(FarmerProfile, on_delete=models.CASCADE)
-    rating = models.PositiveSmallIntegerField(default=5)
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True, blank=True)
+    rating = models.PositiveSmallIntegerField(default=5, validators=[MinValueValidator(1), MaxValueValidator(5)])
     comment = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
 
 class LogisticsEvent(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='events')

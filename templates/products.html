@@ -53,6 +53,16 @@
 let allProducts = [];
 let filterOptions = { categories: [], varieties: {}, origins: [] };
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+}
+
 // 加载筛选选项
 fetch('/api/products/filter-options/')
   .then(r => r.json())
@@ -146,18 +156,18 @@ function renderProducts(list) {
     <div class="col-lg-3 col-md-4 col-6">
       <div class="card h-100">
         ${p.image ? `
-          <img src="${p.image}" class="card-img-top" style="height:180px;object-fit:cover;" alt="${p.name}">
+          <img src="${escapeHtml(p.image)}" class="card-img-top" style="height:180px;object-fit:cover;" alt="${escapeHtml(p.name)}">
         ` : `
           <div class="card-img-top d-flex align-items-center justify-content-center" style="height:180px;background:#e8f5e9;font-size:3rem;color:#2d8a4e;">
             <i class="bi bi-${p.category === '水果' ? 'apple' : p.category === '蔬菜' ? 'flower1' : p.category === '谷物' ? 'flower2' : 'basket'}"></i>
           </div>
         `}
         <div class="card-body d-flex flex-column">
-          <span class="badge-trace mb-1" style="align-self:flex-start;">${p.category || '农产品'}</span>
-          <h5 class="card-title">${p.name}</h5>
-          <p class="card-text small flex-grow-1">${p.description ? p.description.substring(0,80) : '来自优质产地的健康农产品'}</p>
+          <span class="badge-trace mb-1" style="align-self:flex-start;">${escapeHtml(p.category || '农产品')}</span>
+          <h5 class="card-title">${escapeHtml(p.name)}</h5>
+          <p class="card-text small flex-grow-1">${escapeHtml(p.description ? p.description.substring(0,80) : '来自优质产地的健康农产品')}</p>
           <div class="d-flex justify-content-between align-items-center mt-auto">
-            <span class="price">¥${parseFloat(p.price).toFixed(2)} <small>/ ${p.unit||'kg'}</small></span>
+            <span class="price">¥${Number.parseFloat(p.price).toFixed(2)} <small>/ ${escapeHtml(p.unit||'kg')}</small></span>
             <a href="/products/${p.id}/" class="btn btn-sm btn-outline-primary">详情 <i class="bi bi-arrow-right"></i></a>
           </div>
         </div>

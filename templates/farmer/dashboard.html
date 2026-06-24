@@ -77,9 +77,15 @@
                       <a href="{% url 'farmer_product_edit' p.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
                     {% endif %}
                     {% if p.status == 'draft' %}
-                      <a href="{% url 'farmer_product_submit' p.pk %}" class="btn btn-sm btn-outline-success"><i class="bi bi-send"></i></a>
+                      <form method="post" action="{% url 'farmer_product_submit' p.pk %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-outline-success"><i class="bi bi-send"></i></button>
+                      </form>
                     {% endif %}
-                    <a href="{% url 'farmer_product_delete' p.pk %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('确定删除「{{ p.name }}」？')"><i class="bi bi-trash"></i></a>
+                    <form method="post" action="{% url 'farmer_product_delete' p.pk %}" class="d-inline" onsubmit="return confirm('确定删除「{{ p.name }}」？')">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                    </form>
                   </td>
                 </tr>
                 {% empty %}
