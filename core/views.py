@@ -11,7 +11,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib import messages
 from django.db import transaction
-from django.db.models import Count, Sum, Q, F, DecimalField, ExpressionWrapper
+from django.db.models import Count, Sum, Q, F, DecimalField, ExpressionWrapper, Avg
 from django.utils import timezone
 from django.db.models.functions import TruncMonth
 from decimal import Decimal, InvalidOperation
@@ -1351,11 +1351,11 @@ def notifications_mark_read(request, pk):
 def rankings_view(request):
     """热销/好评/新品排行榜"""
     hot = Product.objects.filter(status='approved').annotate(
-        total_sold=Sum('batches__orderItems__quantity', default=0)
+        total_sold=Sum('batches__orderitem_set__quantity', default=0)
     ).order_by('-total_sold')[:20]
     newest = Product.objects.filter(status='approved').order_by('-created_at')[:20]
     best = Product.objects.filter(status='approved').annotate(
-        avg_rating=Sum('review__rating') / Count('review', default=1)
+        avg_rating=Avg('review_set__rating', default=0)
     ).order_by('-avg_rating')[:20]
     return render(request, 'rankings.html', {
         'hot_products': hot,
