@@ -1351,11 +1351,11 @@ def notifications_mark_read(request, pk):
 def rankings_view(request):
     """热销/好评/新品排行榜"""
     hot = Product.objects.filter(status='approved').annotate(
-        total_sold=Sum('batches__orderitem_set__quantity', default=0)
+        total_sold=Sum('batches__orderitem__quantity', default=0)
     ).order_by('-total_sold')[:20]
     newest = Product.objects.filter(status='approved').order_by('-created_at')[:20]
     best = Product.objects.filter(status='approved').annotate(
-        avg_rating=Avg('review_set__rating', default=0)
+        avg_rating=Avg('review__rating', default=0)
     ).order_by('-avg_rating')[:20]
     return render(request, 'rankings.html', {
         'hot_products': hot,
