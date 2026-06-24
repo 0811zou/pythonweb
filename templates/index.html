@@ -24,7 +24,15 @@
         <div class="d-flex flex-wrap gap-3">
           <a href="/products/" class="btn btn-primary btn-lg"><i class="bi bi-basket"></i> 浏览农产品</a>
           <a href="/trace/" class="btn btn-outline-light btn-lg"><i class="bi bi-qr-code-scan"></i> 扫码溯源</a>
-          <a href="/dashboard/" class="btn btn-outline-light btn-lg"><i class="bi bi-bar-chart"></i> 数据看板</a>
+          {% if user.is_authenticated %}
+            {% if user.farmerprofile %}
+              <a href="{% url 'farmer_dashboard' %}" class="btn btn-success btn-lg"><i class="bi bi-person-circle"></i> 农户工作台</a>
+            {% else %}
+              <a href="{% url 'cart_view' %}" class="btn btn-success btn-lg"><i class="bi bi-cart"></i> 购物车</a>
+            {% endif %}
+          {% else %}
+            <a href="{% url 'login' %}" class="btn btn-outline-light btn-lg"><i class="bi bi-box-arrow-in-right"></i> 登录/注册</a>
+          {% endif %}
         </div>
       </div>
       <div class="col-lg-5 text-center d-none d-lg-block">
@@ -94,10 +102,22 @@
       <span style="font-size:2rem;">🎯</span>
       <div>
         <h2 class="section-title mb-0">猜你喜欢</h2>
-        <p class="text-muted mb-0">基于你的喜好为你推荐</p>
+        <p class="text-muted mb-0">
+          {% if user.is_authenticated %}
+            基于你的喜好为你推荐
+          {% else %}
+            <a href="{% url 'login' %}" class="text-decoration-none">登录后获取个性化推荐</a>
+          {% endif %}
+        </p>
       </div>
     </div>
-    <p class="section-subtitle" style="margin-left: 3.5rem;">看看这些产品是否合你心意</p>
+    <p class="section-subtitle" style="margin-left: 3.5rem;">
+      {% if user.is_authenticated %}
+      看看这些产品是否合你心意
+      {% else %}
+      <a href="{% url 'register' %}" class="text-success">免费注册</a>，发现更多优质农产品
+      {% endif %}
+    </p>
     <div class="row g-4" id="recommend-products-grid">
       <div class="col-12 text-center py-4"><div class="spinner-border text-success" role="status"></div></div>
     </div>
@@ -162,12 +182,35 @@
 <!-- CTA -->
 <section class="py-5 text-center" style="background: linear-gradient(135deg, #e8f5e9, #f1f8e9);">
   <div class="container">
-    <h2 class="section-title">加入智溯农链</h2>
-    <p class="section-subtitle">农户可洞察市场需求，消费者可追溯产品源头</p>
+    <h2 class="section-title">
+      {% if user.is_authenticated %}
+        {% if user.farmerprofile %}欢迎回来，{{ user.username }}！
+        {% else %}{{ user.username }}，开始选购吧！
+        {% endif %}
+      {% else %}加入智溯农链{% endif %}
+    </h2>
+    <p class="section-subtitle">
+      {% if user.is_authenticated %}
+        {% if user.farmerprofile %}
+          查看你的产品和订单，或浏览市场分析
+        {% else %}
+          去溯源查询验证产品来源，或继续购物
+        {% endif %}
+      {% else %}
+        农户可洞察市场需求，消费者可追溯产品源头
+      {% endif %}
+    </p>
     <div class="d-flex justify-content-center gap-3 flex-wrap">
-      <a href="{% url 'register' %}" class="btn btn-primary btn-lg"><i class="bi bi-person-plus"></i> 立即注册</a>
-      <a href="/trace/" class="btn btn-outline-primary btn-lg"><i class="bi bi-qr-code-scan"></i> 查询溯源</a>
-      <a href="/dashboard/" class="btn btn-outline-primary btn-lg"><i class="bi bi-bar-chart"></i> 数据看板</a>
+      {% if user.is_authenticated %}
+        <a href="/products/" class="btn btn-primary btn-lg"><i class="bi bi-basket"></i> 去购物</a>
+        <a href="/trace/" class="btn btn-outline-primary btn-lg"><i class="bi bi-qr-code-scan"></i> 溯源查询</a>
+        {% if user.farmerprofile %}
+          <a href="{% url 'farmer_dashboard' %}" class="btn btn-success btn-lg"><i class="bi bi-person-circle"></i> 工作台</a>
+        {% endif %}
+      {% else %}
+        <a href="{% url 'register' %}" class="btn btn-primary btn-lg"><i class="bi bi-person-plus"></i> 免费注册</a>
+        <a href="{% url 'login' %}" class="btn btn-outline-primary btn-lg"><i class="bi bi-box-arrow-in-right"></i> 立即登录</a>
+      {% endif %}
     </div>
   </div>
 </section>
@@ -321,16 +364,17 @@ Promise.all([
       productCard(p, { text: '助农', bg: 'warning text-dark' })
     ).join('');
   }
-}).catch(() => {
-  // 猜你喜欢 - 随机推荐8个产品
+
+  // 猜你喜欢
   const shuffled = [...products].sort(() => Math.random() - 0.5);
   const recommendGrid = document.getElementById('recommend-products-grid');
   recommendGrid.innerHTML = shuffled.slice(0, 8).map(p =>
     productCard(p, { text: '推荐', bg: 'info text-dark' })
   ).join('');
-
-  ['hot-products-grid', 'new-products-grid', 'help-products-grid'].forEach(id => {
-    document.getElementById(id).innerHTML = '<div class="col-12 text-center py-4 text-muted">加载失败</div>';
+}).catch(() => {
+  ['hot-products-grid', 'new-products-grid', 'help-products-grid', 'recommend-products-grid'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<div class="col-12 text-center py-4 text-muted">加载失败</div>';
   });
 });
 </script>
