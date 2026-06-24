@@ -5,5 +5,11 @@ venv/
 .venv/
 .env
 media/
+*.tar
+ngrok.exe
+
+# 临时/备份目录
+pythonweb_min/
+pythonweb_backup/
 
 .env.production
