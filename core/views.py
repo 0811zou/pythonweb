@@ -11,10 +11,11 @@ from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib import messages
 from django.db import transaction
 from django.db.models import Count, Sum, Q, F, DecimalField, ExpressionWrapper
+from django.utils import timezone
 from django.db.models.functions import TruncMonth
 from decimal import Decimal, InvalidOperation
 from functools import wraps
-from .models import Product, ProductBatch, Order, OrderItem, SubsidyApplication, Training, FarmerProfile, Cooperative, Review, TraceEvent
+from .models import Product, ProductBatch, Order, OrderItem, SubsidyApplication, Training, FarmerProfile, Cooperative, Review, TraceEvent, Announcement
 from .permissions import IsAdminOrReadOnly, IsFarmerOwnerOrAdmin, IsOrderParticipantOrAdmin, IsSubsidyOwnerOrAdmin, get_farmer_profile
 from .serializers import (
     ProductSerializer, ProductBatchSerializer, OrderSerializer,
@@ -359,7 +360,8 @@ def trace_view(request, batch_code):
 
 # ===== 前端页面 =====
 def home_view(request):
-    return render(request, 'index.html')
+    announcements = Announcement.objects.filter(is_active=True)[:5]
+    return render(request, 'index.html', {'announcements': announcements})
 
 def product_list_view(request):
     return render(request, 'products.html')
@@ -775,11 +777,15 @@ def farmer_dashboard(request):
     """农户工作台"""
     profile = request.farmer_profile
     products = Product.objects.filter(farmer=profile).order_by('-created_at')
+    batches = ProductBatch.objects.filter(product__farmer=profile)
     stats = {
         'total': products.count(),
         'approved': products.filter(status='approved').count(),
         'pending': products.filter(status='pending').count(),
         'draft': products.filter(status='draft').count(),
+        'batches_total': batches.count(),
+        'batches_approved': batches.filter(status='approved').count(),
+        'batches_pending': batches.filter(status='pending').count(),
     }
     return render(request, 'farmer/dashboard.html', {'products': products, 'stats': stats})
 
@@ -887,6 +893,181 @@ def farmer_product_submit(request, pk):
     return redirect('farmer_products')
 
 
+# ===== 农户批次管理 =====
+
+@farmer_required
+def farmer_batch_list(request):
+    """农户查看所有批次"""
+    profile = request.farmer_profile
+    batches = ProductBatch.objects.filter(
+        product__farmer=profile
+    ).select_related('product').order_by('-created_at')
+    return render(request, 'farmer/batches.html', {'batches': batches})
+
+
+@farmer_required
+def farmer_batch_create(request):
+    """农户创建新批次（含质检上传）"""
+    profile = request.farmer_profile
+    products = Product.objects.filter(farmer=profile, status='approved')
+
+    if request.method == 'POST':
+        product_id = request.POST.get('product_id')
+        harvest_date = request.POST.get('harvest_date', '')
+        quantity = request.POST.get('quantity', '0')
+        qc_report = request.POST.get('qc_report', '').strip()
+        location = request.POST.get('location', '').strip()
+
+        product = get_object_or_404(Product, pk=product_id, farmer=profile)
+        try:
+            qty = int(quantity)
+        except (TypeError, ValueError):
+            messages.error(request, '请输入有效数量')
+            return render(request, 'farmer/batch_form.html', {'products': products})
+
+        if qty <= 0:
+            messages.error(request, '数量必须大于0')
+            return render(request, 'farmer/batch_form.html', {'products': products})
+
+        batch = ProductBatch.objects.create(
+            product=product,
+            harvest_date=harvest_date or None,
+            quantity=qty,
+            qc_report=qc_report,
+            trace_info={'location': location, 'farmer': profile.user.username},
+            status='pending',
+        )
+
+        # 上传质检图片（多图）
+        qc_files = request.FILES.getlist('qc_images')
+        if qc_files:
+            import uuid, os
+            from django.core.files.storage import default_storage
+            urls = []
+            for f in qc_files:
+                safe_name = f'{uuid.uuid4().hex}_{f.name}'
+                path = default_storage.save(f'qc/{safe_name}', f)
+                urls.append(path)
+            batch.qc_images = urls
+            batch.save(update_fields=['qc_images'])
+
+        # 自动创建溯源事件
+        TraceEvent.objects.create(
+            batch=batch,
+            event_type='qc',
+            title='质检报告提交',
+            description=qc_report or '已提交质检资料，等待审核',
+            operator=request.user,
+            occurred_at=timezone.now(),
+            location=location,
+        )
+
+        messages.success(request, f'批次 {batch.batch_code} 已创建，等待审核')
+        return redirect('farmer_batch_list')
+
+    return render(request, 'farmer/batch_form.html', {'products': products})
+
+
+@farmer_required
+def farmer_batch_detail(request, pk):
+    """批次详情：查看二维码、溯源事件"""
+    profile = request.farmer_profile
+    batch = get_object_or_404(ProductBatch, pk=pk, product__farmer=profile)
+    events = batch.events.all().order_by('occurred_at')
+    return render(request, 'farmer/batch_detail.html', {
+        'batch': batch,
+        'events': events,
+    })
+
+
+def download_qr(request, pk):
+    """下载二维码图片"""
+    batch = get_object_or_404(ProductBatch, pk=pk)
+    if not batch.qr_code:
+        batch.ensure_qr_code()
+    from django.http import FileResponse
+    return FileResponse(batch.qr_code.open('rb'), as_attachment=True,
+                        filename=f'{batch.batch_code}_qrcode.png')
+
+
+# ===== 农户店铺 =====
+
+def farmer_shop_view(request, farmer_id):
+    """农户公开店铺页"""
+    profile = get_object_or_404(FarmerProfile, pk=farmer_id)
+    products = Product.objects.filter(farmer=profile, status='approved').order_by('-created_at')
+    batches = ProductBatch.objects.filter(
+        product__farmer=profile, status='approved'
+    ).select_related('product').order_by('-created_at')[:10]
+    return render(request, 'farmer/shop.html', {
+        'farmer': profile,
+        'products': products,
+        'batches': batches,
+    })
+
+
+# ===== 订单物流 =====
+
+@farmer_required
+def farmer_set_tracking(request, order_id):
+    """农户填写快递单号"""
+    profile = request.farmer_profile
+    order = get_object_or_404(Order, pk=order_id, items__product_batch__product__farmer=profile)
+    if request.method == 'POST':
+        tracking = request.POST.get('tracking_number', '').strip()
+        if not tracking:
+            messages.error(request, '请输入快递单号')
+        else:
+            order.tracking_number = tracking
+            order.status = 'shipped'
+            order.shipped_at = timezone.now()
+            order.save(update_fields=['tracking_number', 'status', 'shipped_at'])
+            messages.success(request, '发货成功')
+        return redirect('farmer_orders')
+    return render(request, 'farmer/tracking_form.html', {'order': order})
+
+
+# ===== 管理端 CSV 导出 =====
+
+def admin_required(view_func):
+    """装饰器：检查管理员"""
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        if not request.user.is_authenticated or not request.user.is_staff:
+            messages.error(request, '需要管理员权限')
+            return redirect('home')
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+@admin_required
+def export_orders_csv(request):
+    """导出订单 CSV"""
+    import csv
+    from django.http import HttpResponse
+    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+    response['Content-Disposition'] = 'attachment; filename="orders.csv"'
+    writer = csv.writer(response)
+    writer.writerow(['订单号', '买家', '总金额', '状态', '地址', '快递单号', '创建时间'])
+    for o in Order.objects.select_related('buyer').order_by('-created_at'):
+        writer.writerow([o.id, o.buyer.username, o.total_amount, o.status, o.address, o.tracking_number, o.created_at])
+    return response
+
+
+@admin_required
+def export_products_csv(request):
+    """导出产品 CSV"""
+    import csv
+    from django.http import HttpResponse
+    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+    response['Content-Disposition'] = 'attachment; filename="products.csv"'
+    writer = csv.writer(response)
+    writer.writerow(['产品名', '分类', '品种', '价格', '单位', '农户', '状态', '创建时间'])
+    for p in Product.objects.select_related('farmer__user').order_by('-created_at'):
+        writer.writerow([p.name, p.category, p.variety, p.price, p.unit, p.farmer.user.username, p.status, p.created_at])
+    return response
+
+
 # ===== 管理端功能 =====
 
 def admin_required(view_func):
@@ -908,12 +1089,14 @@ def admin_dashboard(request):
     farmers_total = FarmerProfile.objects.count()
     users_total = User.objects.count()
     orders_total = Order.objects.count()
+    batches_pending = ProductBatch.objects.filter(status='pending').count()
     return render(request, 'admin/dashboard.html', {
         'products_pending': products_pending,
         'products_total': products_total,
         'farmers_total': farmers_total,
         'users_total': users_total,
         'orders_total': orders_total,
+        'batches_pending': batches_pending,
     })
 
 

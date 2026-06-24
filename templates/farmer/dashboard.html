@@ -23,6 +23,7 @@
         </div>
         <nav class="nav flex-column">
           <a class="nav-link active" href="{% url 'farmer_dashboard' %}"><i class="bi bi-speedometer2"></i> 工作台</a>
+          <a class="nav-link" href="{% url 'farmer_batch_list' %}"><i class="bi bi-box-seam"></i> 批次管理</a>
           <a class="nav-link" href="{% url 'farmer_product_create' %}"><i class="bi bi-gear"></i> 管理产品</a>
           <a class="nav-link" href="{% url 'farmer_orders' %}"><i class="bi bi-receipt"></i> 订单管理</a>
           <a class="nav-link" href="{% url 'market_analysis' %}"><i class="bi bi-graph-up-arrow"></i> 市场分析</a>
@@ -47,6 +48,27 @@
         </div>
         <div class="col-md-3 col-6">
           <div class="stat-card"><div class="stat-number" style="color:#95a5a6;">{{ stats.draft }}</div><div class="text-muted">草稿</div></div>
+        </div>
+      </div>
+      <!-- 批次概览 -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-4 col-6">
+          <div class="stat-card" style="padding:14px;">
+            <div class="stat-number" style="font-size:1.5rem;color:#2d8a4e;">{{ stats.batches_total }}</div>
+            <div class="text-muted">全部批次</div>
+          </div>
+        </div>
+        <div class="col-md-4 col-6">
+          <div class="stat-card" style="padding:14px;">
+            <div class="stat-number" style="font-size:1.5rem;color:#27ae60;">{{ stats.batches_approved }}</div>
+            <div class="text-muted">已通过</div>
+          </div>
+        </div>
+        <div class="col-md-4 col-6">
+          <div class="stat-card" style="padding:14px;">
+            <div class="stat-number" style="font-size:1.5rem;color:#f39c12;">{{ stats.batches_pending }}</div>
+            <div class="text-muted">待质检</div>
+          </div>
         </div>
       </div>
       <!-- 产品列表 -->

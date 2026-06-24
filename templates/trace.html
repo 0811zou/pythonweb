@@ -72,6 +72,17 @@
           <table class="table table-sm table-borderless mb-0">
             <tr><td class="text-muted" style="width:100px;">收获日期</td><td>{{ batch.harvest_date|default:'未记录' }}</td></tr>
             <tr><td class="text-muted">质检报告</td><td>{{ batch.qc_report|default:'未提供'|linebreaksbr }}</td></tr>
+            {% if batch.qc_images %}
+            <tr><td class="text-muted">质检图片</td><td>
+              <div class="d-flex gap-2 flex-wrap">
+                {% for img in batch.qc_images %}
+                  <a href="/media/{{ img }}" target="_blank">
+                    <img src="/media/{{ img }}" style="height:60px;width:60px;object-fit:cover;border-radius:6px;" alt="质检图片">
+                  </a>
+                {% endfor %}
+              </div>
+            </td></tr>
+            {% endif %}
           </table>
         </div>
       </div>

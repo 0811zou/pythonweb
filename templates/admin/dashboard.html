@@ -19,6 +19,10 @@
           <a class="nav-link" href="{% url 'admin_products' %}"><i class="bi bi-basket"></i> 产品审核</a>
           <a class="nav-link" href="{% url 'admin_users' %}"><i class="bi bi-people"></i> 用户管理</a>
           <a class="nav-link" href="/admin/" target="_blank"><i class="bi bi-gear"></i> Django Admin</a>
+          <a class="nav-link" href="/admin/core/announcement/" target="_blank"><i class="bi bi-megaphone"></i> 公告管理</a>
+          <hr class="my-2">
+          <a class="nav-link" href="{% url 'export_orders' %}"><i class="bi bi-download"></i> 导出订单</a>
+          <a class="nav-link" href="{% url 'export_products' %}"><i class="bi bi-download"></i> 导出产品</a>
         </nav>
       </div>
     </div>
@@ -26,6 +30,7 @@
       <h4 class="fw-bold mb-4"><i class="bi bi-speedometer2 text-danger"></i> 管理概览</h4>
       <div class="row g-3 mb-4">
         <div class="col-md-3 col-6"><div class="stat-card"><div class="stat-number" style="color:#e74c3c;">{{ products_pending }}</div><div class="text-muted">待审核产品</div></div></div>
+        <div class="col-md-3 col-6"><div class="stat-card"><div class="stat-number" style="color:#f39c12;">{{ batches_pending }}</div><div class="text-muted">待审批次</div></div></div>
         <div class="col-md-3 col-6"><div class="stat-card"><div class="stat-number" style="color:#2d8a4e;">{{ products_total }}</div><div class="text-muted">产品总数</div></div></div>
         <div class="col-md-3 col-6"><div class="stat-card"><div class="stat-number" style="color:#3498db;">{{ farmers_total }}</div><div class="text-muted">入驻农户</div></div></div>
         <div class="col-md-3 col-6"><div class="stat-card"><div class="stat-number" style="color:#9b59b6;">{{ users_total }}</div><div class="text-muted">注册用户</div></div></div>

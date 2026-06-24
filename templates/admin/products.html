@@ -17,6 +17,9 @@
           <a class="nav-link active" href="{% url 'admin_products' %}"><i class="bi bi-basket"></i> 产品审核</a>
           <a class="nav-link" href="{% url 'admin_users' %}"><i class="bi bi-people"></i> 用户管理</a>
           <a class="nav-link" href="/admin/" target="_blank"><i class="bi bi-gear"></i> Django Admin</a>
+          <hr class="my-2">
+          <a class="nav-link" href="{% url 'export_orders' %}"><i class="bi bi-download"></i> 导出订单</a>
+          <a class="nav-link" href="{% url 'export_products' %}"><i class="bi bi-download"></i> 导出产品</a>
         </nav>
       </div>
     </div>

@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+{% block title %}新建批次 - 智溯农链{% endblock %}
+{% block content %}
+<div class="container py-4" style="max-width: 720px;">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="{% url 'farmer_dashboard' %}">工作台</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'farmer_batch_list' %}">批次管理</a></li>
+      <li class="breadcrumb-item active">新建批次</li>
+    </ol>
+  </nav>
+
+  <div class="card">
+    <div class="card-header bg-white"><h5 class="mb-0"><i class="bi bi-plus-circle text-success"></i> 新建批次</h5></div>
+    <div class="card-body">
+      {% if messages %}
+        {% for m in messages %}
+          <div class="alert alert-{{ m.tags }} alert-dismissible fade show">{{ m }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+        {% endfor %}
+      {% endif %}
+
+      {% if not products %}
+        <div class="text-center py-4 text-muted">
+          <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
+          <p>暂无已上架的产品，请先发布产品。</p>
+          <a href="{% url 'farmer_product_create' %}" class="btn btn-success">发布产品</a>
+        </div>
+      {% else %}
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div class="mb-3">
+          <label class="form-label">选择产品 <span class="text-danger">*</span></label>
+          <select name="product_id" class="form-select" required>
+            <option value="">-- 请选择 --</option>
+            {% for p in products %}
+              <option value="{{ p.id }}">{{ p.name }} (¥{{ p.price }}/{{ p.unit }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-md-6">
+            <label class="form-label">采收日期</label>
+            <input type="date" name="harvest_date" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">数量 <span class="text-danger">*</span></label>
+            <input type="number" name="quantity" class="form-control" min="1" required placeholder="例如 500">
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">产地/位置</label>
+          <input type="text" name="location" class="form-control" placeholder="如：山东省寿光市孙家集街道">
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">质检报告描述</label>
+          <textarea name="qc_report" class="form-control" rows="3" placeholder="描述质检情况，如检测项目、结果等"></textarea>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">质检图片（可多选）</label>
+          <input type="file" name="qc_images" class="form-control" accept="image/*" multiple>
+          <div class="form-text">支持 jpg/png 格式，可多选</div>
+        </div>
+
+        <div class="border-top pt-3">
+          <button type="submit" class="btn btn-success"><i class="bi bi-check-lg"></i> 提交批次</button>
+          <a href="{% url 'farmer_batch_list' %}" class="btn btn-outline-secondary ms-2">取消</a>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -34,6 +34,22 @@
   </div>
 </section>
 
+{% if announcements %}
+<!-- 公告 -->
+<section class="py-2" style="background:linear-gradient(135deg,#fff8e1,#fff3cd);border-bottom:1px solid #ffeeba;">
+  <div class="container">
+    <div class="d-flex align-items-center flex-wrap gap-3">
+      <span class="badge bg-warning text-dark fs-6"><i class="bi bi-megaphone"></i> 公告</span>
+      <div class="flex-grow-1 overflow-hidden" style="white-space:nowrap;">
+        {% for a in announcements %}
+          <span class="me-4"><strong>{{ a.title }}</strong>：{{ a.content|truncatechars:80 }}</span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+
 <!-- Stats -->
 <section class="py-4" style="background: var(--white); border-bottom: 1px solid #f0f0f0;">
   <div class="container">

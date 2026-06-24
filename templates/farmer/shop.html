@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% block title %}{{ farmer.user.username }}的店铺 - 智溯农链{% endblock %}
+{% block content %}
+<div class="container py-4">
+
+  <!-- 店铺头部 -->
+  <div class="card border-0 shadow-sm mb-4" style="background:linear-gradient(135deg,#e8f5e9,#c8e6c9);border-radius:16px;">
+    <div class="card-body text-center py-5">
+      <div style="width:72px;height:72px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:2.5rem;color:#2d8a4e;margin:0 auto 12px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+        <i class="bi bi-person-circle"></i>
+      </div>
+      <h3 class="fw-bold mb-1">{{ farmer.user.username }}</h3>
+      <p class="text-muted mb-2">
+        <i class="bi bi-geo-alt"></i> {{ farmer.address|default:'地址未填写' }}
+      </p>
+      {% if farmer.cooperative %}
+      <span class="badge bg-success"><i class="bi bi-building"></i> {{ farmer.cooperative.name }}</span>
+      {% endif %}
+      <p class="mt-2 mb-0 text-muted small">{{ products|length }} 个在售产品 · {{ batches|length }}+ 个批次</p>
+    </div>
+  </div>
+
+  <h4 class="fw-bold mb-3"><i class="bi bi-basket text-success"></i> 在售产品</h4>
+  {% if products %}
+  <div class="row g-3">
+    {% for p in products %}
+    <div class="col-md-3 col-6">
+      <div class="card h-100 shadow-sm">
+        {% if p.image %}
+        <img src="{{ p.image.url }}" class="card-img-top" style="height:180px;object-fit:cover;" alt="{{ p.name }}">
+        {% else %}
+        <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height:180px;">
+          <i class="bi bi-basket" style="font-size:3rem;color:#bbb;"></i>
+        </div>
+        {% endif %}
+        <div class="card-body">
+          <h6 class="card-title fw-bold mb-1">{{ p.name }}</h6>
+          <span class="badge bg-success bg-opacity-10 text-success mb-2">{{ p.category|default:'农产品' }}</span>
+          <div class="d-flex justify-content-between align-items-center">
+            <span class="fw-bold text-success">¥{{ p.price }}<small>/{{ p.unit }}</small></span>
+            <a href="{% url 'product_detail' p.id %}" class="btn btn-sm btn-outline-success">详情</a>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-inbox" style="font-size:3rem;display:block;margin-bottom:8px;"></i>
+    <p>暂无在售产品</p>
+  </div>
+  {% endif %}
+
+  {% if batches %}
+  <h4 class="fw-bold mt-4 mb-3"><i class="bi bi-box-seam text-success"></i> 最近批次</h4>
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <thead class="table-light">
+        <tr><th>批次编号</th><th>产品</th><th>采收日期</th><th>数量</th></tr>
+      </thead>
+      <tbody>
+        {% for b in batches %}
+        <tr>
+          <td><a href="{% url 'trace' b.batch_code %}"><code>{{ b.batch_code }}</code></a></td>
+          <td>{{ b.product.name }}</td>
+          <td>{{ b.harvest_date|default:'-' }}</td>
+          <td>{{ b.quantity }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

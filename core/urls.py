@@ -4,8 +4,7 @@ from .views import (
     ProductViewSet, ProductBatchViewSet, OrderViewSet,
     SubsidyViewSet, TrainingViewSet,
     trace_view, home_view, product_list_view, product_detail_view,
-    map_view,
-    product_batches_view,
+    map_view, product_batches_view,
     trace_query_view, login_view, logout_view, register_view,
     dashboard_stats, dashboard_view,
     province_products, product_reviews,
@@ -15,9 +14,12 @@ from .views import (
     farmer_dashboard, farmer_product_create,
     farmer_product_edit, farmer_product_delete, farmer_product_submit,
     farmer_orders_view,
+    farmer_batch_list, farmer_batch_create, farmer_batch_detail,
+    farmer_shop_view, download_qr,
+    farmer_set_tracking,
+    export_orders_csv, export_products_csv,
     admin_dashboard, admin_products, admin_product_review, admin_users,
     order_create_view, consumer_orders_view,
-    product_reviews,
 )
 
 router = routers.DefaultRouter()
@@ -57,9 +59,17 @@ urlpatterns = [
     path('farmer/products/<int:pk>/delete/', farmer_product_delete, name='farmer_product_delete'),
     path('farmer/products/<int:pk>/submit/', farmer_product_submit, name='farmer_product_submit'),
     path('farmer/orders/', farmer_orders_view, name='farmer_orders'),
+    path('farmer/batches/', farmer_batch_list, name='farmer_batch_list'),
+    path('farmer/batches/create/', farmer_batch_create, name='farmer_batch_create'),
+    path('farmer/batches/<int:pk>/', farmer_batch_detail, name='farmer_batch_detail'),
+    path('farmer/batches/<int:pk>/qr/', download_qr, name='download_qr'),
+    path('farmer/orders/<int:order_id>/tracking/', farmer_set_tracking, name='farmer_set_tracking'),
+    path('farmer/<int:farmer_id>/shop/', farmer_shop_view, name='farmer_shop'),
     # 管理端
     path('manage/', admin_dashboard, name='admin_dashboard'),
     path('manage/products/', admin_products, name='admin_products'),
     path('manage/products/<int:pk>/<str:action>/', admin_product_review, name='admin_product_review'),
     path('manage/users/', admin_users, name='admin_users'),
+    path('manage/export/orders/', export_orders_csv, name='export_orders'),
+    path('manage/export/products/', export_products_csv, name='export_products'),
 ]

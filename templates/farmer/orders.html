@@ -14,6 +14,7 @@
         </div>
         <nav class="nav flex-column">
           <a class="nav-link" href="{% url 'farmer_dashboard' %}"><i class="bi bi-speedometer2"></i> 工作台</a>
+          <a class="nav-link" href="{% url 'farmer_batch_list' %}"><i class="bi bi-box-seam"></i> 批次管理</a>
           <a class="nav-link" href="{% url 'farmer_product_create' %}"><i class="bi bi-gear"></i> 管理产品</a>
           <a class="nav-link active" href="{% url 'farmer_orders' %}"><i class="bi bi-receipt"></i> 订单管理</a>
           <a class="nav-link" href="{% url 'market_analysis' %}"><i class="bi bi-graph-up-arrow"></i> 市场分析</a>
@@ -56,7 +57,18 @@
                 <small class="text-muted">收货地: {{ order.address|truncatechars:20 }}</small>
               </div>
             </div>
+            {% if order.tracking_number %}
+            <div class="mt-2 pt-2 border-top small text-muted">
+              <i class="bi bi-truck"></i> 快递单号：<code>{{ order.tracking_number }}</code>
+              {% if order.shipped_at %} · 发货时间：{{ order.shipped_at|date:'m-d H:i' }}{% endif %}
+            </div>
+            {% endif %}
           </div>
+          {% if order.status == 'confirmed' or order.status == 'paid_offline' %}
+          <div class="card-footer bg-white text-end">
+            <a href="{% url 'farmer_set_tracking' order.id %}" class="btn btn-sm btn-success"><i class="bi bi-truck"></i> 发货</a>
+          </div>
+          {% endif %}
         </div>
         {% endfor %}
       {% else %}
