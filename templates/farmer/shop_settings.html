@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+{% block title %}店铺设置 - 智溯农链{% endblock %}
+{% block content %}
+<style>
+.farmer-sidebar { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.farmer-sidebar .nav-link { border-radius: 8px; padding: 10px 16px; color: #555; transition: all 0.2s; }
+.farmer-sidebar .nav-link:hover { background: #e8f5e9; color: #2d8a4e; }
+.farmer-sidebar .nav-link.active { background: #2d8a4e; color: #fff; }
+</style>
+<div class="container-fluid py-4">
+  <div class="row">
+    <div class="col-md-2 mb-3">
+      <div class="farmer-sidebar">
+        <div class="text-center mb-3 pb-2 border-bottom">
+          <div style="width:56px;height:56px;border-radius:50%;background:#e8f5e9;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:#2d8a4e;margin:0 auto 8px;"><i class="bi bi-person-circle"></i></div>
+          <h6 class="fw-bold mb-0">{{ user.username }}</h6>
+          <small class="text-muted">农户</small>
+        </div>
+        <nav class="nav flex-column">
+          <a class="nav-link" href="{% url 'farmer_dashboard' %}"><i class="bi bi-speedometer2"></i> 工作台</a>
+          <a class="nav-link active" href="{% url 'farmer_shop_settings' %}"><i class="bi bi-shop"></i> 店铺设置</a>
+          <a class="nav-link" href="{% url 'farmer_batch_list' %}"><i class="bi bi-box-seam"></i> 批次管理</a>
+          <a class="nav-link" href="{% url 'farmer_product_create' %}"><i class="bi bi-gear"></i> 管理产品</a>
+          <a class="nav-link" href="{% url 'farmer_orders' %}"><i class="bi bi-receipt"></i> 订单管理</a>
+          <a class="nav-link" href="{% url 'market_analysis' %}"><i class="bi bi-graph-up-arrow"></i> 市场分析</a>
+        </nav>
+      </div>
+    </div>
+    <div class="col-md-10">
+      <h4 class="fw-bold mb-4"><i class="bi bi-shop text-success"></i> 店铺设置</h4>
+      {% if messages %}
+        {% for m in messages %}<div class="alert alert-{{ m.tags }} alert-dismissible fade show">{{ m }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endfor %}
+      {% endif %}
+
+      <div class="row g-4">
+        <div class="col-md-4">
+          <div class="card text-center">
+            <div class="card-body">
+              {% if profile.shop_avatar %}
+              <img src="{{ profile.shop_avatar.url }}" style="width:120px;height:120px;border-radius:50%;object-fit:cover;" class="mb-3">
+              {% else %}
+              <div style="width:120px;height:120px;border-radius:50%;background:#e8f5e9;display:flex;align-items:center;justify-content:center;font-size:3rem;color:#2d8a4e;margin:0 auto 12px;"><i class="bi bi-person-circle"></i></div>
+              {% endif %}
+              <h5 class="fw-bold">{{ user.username }}</h5>
+              <p class="text-muted small mb-0">{{ profile.address|default:'地址未填写' }}</p>
+              <a href="{% url 'farmer_shop' profile.id %}" class="btn btn-sm btn-outline-success mt-2" target="_blank"><i class="bi bi-box-arrow-up-right"></i> 预览店铺</a>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-8">
+          <div class="card">
+            <div class="card-header bg-white"><strong><i class="bi bi-pencil"></i> 编辑信息</strong></div>
+            <div class="card-body">
+              <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="mb-3">
+                  <label class="form-label">店铺头像</label>
+                  <input type="file" name="shop_avatar" class="form-control" accept="image/*">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">店铺简介</label>
+                  <textarea name="shop_description" class="form-control" rows="4" placeholder="介绍一下你的农场和产品...">{{ profile.shop_description }}</textarea>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">地址</label>
+                  <input type="text" name="address" class="form-control" value="{{ profile.address }}" placeholder="省/市/区 详细地址">
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">联系电话</label>
+                  <input type="text" name="phone" class="form-control" value="{{ profile.phone }}" placeholder="手机号">
+                </div>
+                <button type="submit" class="btn btn-success"><i class="bi bi-check-lg"></i> 保存</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

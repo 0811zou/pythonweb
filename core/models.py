@@ -35,6 +35,8 @@ class FarmerProfile(models.Model):
     location_lat = models.FloatField(null=True, blank=True)
     location_lng = models.FloatField(null=True, blank=True)
     verified = models.BooleanField(default=False)
+    shop_description = models.TextField(blank=True, verbose_name='店铺简介')
+    shop_avatar = models.ImageField(upload_to='shop_avatars/', blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -189,6 +191,33 @@ class OrderItem(models.Model):
     product_batch = models.ForeignKey(ProductBatch, on_delete=models.SET_NULL, null=True)
     quantity = models.PositiveIntegerField(default=1)
     price = models.DecimalField(max_digits=10, decimal_places=2)
+
+class Cart(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='cart')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def total_price(self):
+        return sum(item.subtotal() for item in self.items.all())
+
+    def total_items(self):
+        return sum(item.quantity for item in self.items.all())
+
+class CartItem(models.Model):
+    cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    quantity = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def subtotal(self):
+        return self.product.price * self.quantity
+
+class Favorite(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorites')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('user', 'product')
 
 class SubsidyApplication(models.Model):
     STATUS = [('submitted','submitted'),('approved','approved'),('rejected','rejected')]

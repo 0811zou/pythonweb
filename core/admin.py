@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Cooperative, FarmerProfile, Product, ProductBatch, Order, OrderItem, SubsidyApplication, Training, Review, LogisticsEvent, TraceEvent, Announcement
+from .models import Cooperative, FarmerProfile, Product, ProductBatch, Order, OrderItem, SubsidyApplication, Training, Review, LogisticsEvent, TraceEvent, Announcement, Cart, CartItem, Favorite
 
 @admin.register(Cooperative)
 class CooperativeAdmin(admin.ModelAdmin):
@@ -46,3 +46,11 @@ class LogisticsAdmin(admin.ModelAdmin):
 class AnnouncementAdmin(admin.ModelAdmin):
     list_display = ('title','is_active','created_at')
     list_filter = ('is_active',)
+
+@admin.register(Cart)
+class CartAdmin(admin.ModelAdmin):
+    list_display = ('user','created_at')
+
+@admin.register(Favorite)
+class FavoriteAdmin(admin.ModelAdmin):
+    list_display = ('user','product','created_at')

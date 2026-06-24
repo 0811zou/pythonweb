@@ -18,8 +18,11 @@ from .views import (
     farmer_shop_view, download_qr,
     farmer_set_tracking,
     export_orders_csv, export_products_csv,
-    admin_dashboard, admin_products, admin_product_review, admin_users,
+    admin_dashboard, admin_products, admin_product_review, admin_users, admin_batches, admin_batch_review,
     order_create_view, consumer_orders_view,
+    cart_view, cart_add, cart_remove, cart_checkout,
+    favorites_view, favorite_toggle,
+    farmer_shop_settings,
 )
 
 router = routers.DefaultRouter()
@@ -52,6 +55,14 @@ urlpatterns = [
     path('order/create/', order_create_view, name='order_create'),
     path('orders/', consumer_orders_view, name='consumer_orders'),
     path('market/', market_analysis_view, name='market_analysis'),
+    # 购物车
+    path('cart/', cart_view, name='cart_view'),
+    path('cart/add/<int:pk>/', cart_add, name='cart_add'),
+    path('cart/remove/<int:pk>/', cart_remove, name='cart_remove'),
+    path('cart/checkout/', cart_checkout, name='cart_checkout'),
+    # 收藏
+    path('favorites/', favorites_view, name='favorites'),
+    path('favorite/toggle/<int:pk>/', favorite_toggle, name='favorite_toggle'),
     # 农户端
     path('farmer/', farmer_dashboard, name='farmer_dashboard'),
     path('farmer/products/create/', farmer_product_create, name='farmer_product_create'),
@@ -65,11 +76,14 @@ urlpatterns = [
     path('farmer/batches/<int:pk>/qr/', download_qr, name='download_qr'),
     path('farmer/orders/<int:order_id>/tracking/', farmer_set_tracking, name='farmer_set_tracking'),
     path('farmer/<int:farmer_id>/shop/', farmer_shop_view, name='farmer_shop'),
+    path('farmer/shop/settings/', farmer_shop_settings, name='farmer_shop_settings'),
     # 管理端
     path('manage/', admin_dashboard, name='admin_dashboard'),
     path('manage/products/', admin_products, name='admin_products'),
     path('manage/products/<int:pk>/<str:action>/', admin_product_review, name='admin_product_review'),
     path('manage/users/', admin_users, name='admin_users'),
+    path('manage/batches/', admin_batches, name='admin_batches'),
+    path('manage/batches/<int:pk>/<str:action>/', admin_batch_review, name='admin_batch_review'),
     path('manage/export/orders/', export_orders_csv, name='export_orders'),
     path('manage/export/products/', export_products_csv, name='export_products'),
 ]

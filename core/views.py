@@ -6,6 +6,7 @@ from drf_spectacular.utils import extend_schema
 from drf_spectacular.types import OpenApiTypes
 from django.shortcuts import get_object_or_404, render, redirect, reverse
 from django.contrib.auth import login, logout, authenticate
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib import messages
@@ -15,7 +16,7 @@ from django.utils import timezone
 from django.db.models.functions import TruncMonth
 from decimal import Decimal, InvalidOperation
 from functools import wraps
-from .models import Product, ProductBatch, Order, OrderItem, SubsidyApplication, Training, FarmerProfile, Cooperative, Review, TraceEvent, Announcement
+from .models import Product, ProductBatch, Order, OrderItem, SubsidyApplication, Training, FarmerProfile, Cooperative, Review, TraceEvent, Announcement, Cart, CartItem, Favorite
 from .permissions import IsAdminOrReadOnly, IsFarmerOwnerOrAdmin, IsOrderParticipantOrAdmin, IsSubsidyOwnerOrAdmin, get_farmer_profile
 from .serializers import (
     ProductSerializer, ProductBatchSerializer, OrderSerializer,
@@ -1142,3 +1143,140 @@ def admin_users(request):
     """管理端 — 用户管理"""
     users = User.objects.select_related('farmerprofile').all().order_by('-date_joined')
     return render(request, 'admin/users.html', {'users': users})
+
+
+# ===== 购物车 =====
+
+@login_required
+def cart_view(request):
+    """购物车页面"""
+    cart, _ = Cart.objects.get_or_create(user=request.user)
+    items = cart.items.select_related('product').all()
+    return render(request, 'cart.html', {'cart': cart, 'items': items})
+
+
+@login_required
+def cart_add(request, pk):
+    """加入购物车"""
+    product = get_object_or_404(Product, pk=pk, status='approved')
+    if request.method == 'POST':
+        cart, _ = Cart.objects.get_or_create(user=request.user)
+        item, created = CartItem.objects.get_or_create(cart=cart, product=product, defaults={'quantity': 1})
+        if not created:
+            item.quantity += 1
+            item.save()
+        messages.success(request, f'「{product.name}」已加入购物车')
+    return redirect(request.META.get('HTTP_REFERER', 'product_list'))
+
+
+@login_required
+def cart_remove(request, pk):
+    """从购物车移除"""
+    if request.method == 'POST':
+        cart = get_object_or_404(Cart, user=request.user)
+        CartItem.objects.filter(cart=cart, product_id=pk).delete()
+        messages.success(request, '已从购物车移除')
+    return redirect('cart_view')
+
+
+@login_required
+def cart_checkout(request):
+    """购物车结算"""
+    cart = get_object_or_404(Cart, user=request.user)
+    items = list(cart.items.select_related('product__farmer').all())
+    if not items:
+        messages.warning(request, '购物车为空')
+        return redirect('cart_view')
+    if request.method == 'POST':
+        address = request.POST.get('address', '').strip()
+        if not address:
+            messages.error(request, '请输入收货地址')
+            return render(request, 'cart_checkout.html', {'items': items, 'cart': cart})
+        try:
+            with transaction.atomic():
+                total = sum(item.product.price * item.quantity for item in items)
+                order = Order.objects.create(buyer=request.user, total_amount=total, address=address, status='confirmed')
+                for item in items:
+                    batch = ProductBatch.objects.filter(product=item.product, status='approved').first()
+                    OrderItem.objects.create(order=order, product_batch=batch, quantity=item.quantity, price=item.product.price)
+                cart.items.all().delete()
+                messages.success(request, f'下单成功！订单编号 #{order.id}')
+                return redirect('consumer_orders')
+        except Exception as e:
+            messages.error(request, f'下单失败：{str(e)}')
+    return render(request, 'cart_checkout.html', {'items': items, 'cart': cart})
+
+
+# ===== 收藏夹 =====
+
+@login_required
+def favorites_view(request):
+    """收藏列表"""
+    favorites = Favorite.objects.filter(user=request.user).select_related('product').order_by('-created_at')
+    return render(request, 'favorites.html', {'favorites': favorites})
+
+
+@login_required
+def favorite_toggle(request, pk):
+    """切换收藏状态"""
+    product = get_object_or_404(Product, pk=pk)
+    fav, created = Favorite.objects.get_or_create(user=request.user, product=product)
+    if not created:
+        fav.delete()
+        messages.info(request, f'已取消收藏「{product.name}」')
+    else:
+        messages.success(request, f'已收藏「{product.name}」')
+    return redirect(request.META.get('HTTP_REFERER', 'product_list'))
+
+
+# ===== 批次审核 =====
+
+@admin_required
+def admin_batches(request):
+    """批次审核列表"""
+    status_filter = request.GET.get('status', 'pending')
+    batches = ProductBatch.objects.select_related('product__farmer__user').all()
+    if status_filter != 'all':
+        batches = batches.filter(status=status_filter)
+    batches = batches.order_by('-created_at')
+    return render(request, 'admin/batches.html', {'batches': batches, 'current_status': status_filter})
+
+
+@admin_required
+def admin_batch_review(request, pk, action):
+    """审核批次"""
+    if request.method != 'POST':
+        return redirect('admin_batches')
+    batch = get_object_or_404(ProductBatch, pk=pk)
+    if action == 'approve':
+        batch.status = 'approved'
+        TraceEvent.objects.create(batch=batch, event_type='qc', title='质检通过', operator=request.user, description='批次审核通过，准予上架')
+        messages.success(request, f'批次 {batch.batch_code} 已通过')
+    elif action == 'reject':
+        batch.status = 'rejected'
+        note = request.POST.get('note', '').strip()
+        TraceEvent.objects.create(batch=batch, event_type='qc', title='质检未通过', operator=request.user, description=note or '未通过质检审核')
+        messages.warning(request, f'批次 {batch.batch_code} 未通过')
+    else:
+        messages.error(request, '未知操作')
+        return redirect('admin_batches')
+    batch.save(update_fields=['status'])
+    return redirect('admin_batches')
+
+
+# ===== 农户店铺设置 =====
+
+@farmer_required
+def farmer_shop_settings(request):
+    """编辑店铺信息"""
+    profile = request.farmer_profile
+    if request.method == 'POST':
+        profile.shop_description = request.POST.get('shop_description', '').strip()
+        profile.address = request.POST.get('address', '').strip()
+        profile.phone = request.POST.get('phone', '').strip()
+        if request.FILES.get('shop_avatar'):
+            profile.shop_avatar = request.FILES['shop_avatar']
+        profile.save()
+        messages.success(request, '店铺信息已保存')
+        return redirect('farmer_shop_settings')
+    return render(request, 'farmer/shop_settings.html', {'profile': profile})

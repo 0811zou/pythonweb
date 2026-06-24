@@ -35,6 +35,8 @@
               <li class="nav-item"><a class="nav-link {% if '/market/' in request.path %}active{% endif %}" href="/market/"><i class="bi bi-graph-up-arrow"></i> 市场分析</a></li>
             {% else %}
               <!-- 消费者专享导航 -->
+              <li class="nav-item"><a class="nav-link {% if '/cart/' in request.path %}active{% endif %}" href="{% url 'cart_view' %}"><i class="bi bi-cart"></i> 购物车</a></li>
+              <li class="nav-item"><a class="nav-link {% if '/favorites' in request.path %}active{% endif %}" href="{% url 'favorites' %}"><i class="bi bi-heart"></i> 收藏</a></li>
               <li class="nav-item"><a class="nav-link {% if '/orders/' in request.path %}active{% endif %}" href="/orders/"><i class="bi bi-receipt"></i> 我的订单</a></li>
             {% endif %}
           {% endif %}
