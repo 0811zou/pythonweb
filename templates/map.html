@@ -3,6 +3,7 @@
 
 {% block title %}产地分布图 - 智溯农链{% endblock %}
 
+
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 <style>
@@ -27,6 +28,7 @@
   .map-box { height: 420px; }
   .detail-box { max-height: none; }
 }
+
 </style>
 {% endblock %}
 
@@ -59,6 +61,7 @@
             <i class="bi bi-hand-index-thumb"></i>
             <h5 class="text-muted">点击地图上的省份</h5>
             <p class="text-muted small">查看该省在售的农产品</p>
+
           </div>
         </div>
       </div>
@@ -100,6 +103,7 @@
     const chart = echarts.init(mapDom);
     const maxVal = Math.max(...mapData.map(d => d.value), 1);
 
+
     chart.setOption({
       tooltip: {
         trigger: 'item',
@@ -108,6 +112,7 @@
             return '<strong>' + escapeHtml(params.name) + '</strong><br/>产品数量: ' + escapeHtml(params.value);
           }
           return '<strong>' + escapeHtml(params.name) + '</strong><br/>暂无产品';
+
         }
       },
       visualMap: {
@@ -198,6 +203,7 @@
       cards +
       '</div></div>';
   }
+
 })();
 </script>
 {% endblock %}

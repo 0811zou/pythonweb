@@ -17,6 +17,9 @@
 }
 .ai-insight-card .ai-icon { font-size: 2rem; color: #ff9800; }
 .stat-number { font-size: 2rem; font-weight: 700; color: var(--primary); }
+.chart-scroll { max-height: 420px; overflow-y: auto; }
+.chart-scroll::-webkit-scrollbar { width: 6px; }
+.chart-scroll::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
 </style>
 {% endblock %}
 
@@ -75,13 +78,19 @@
       <div class="col-lg-7">
         <div class="card p-3 h-100">
           <h5><i class="bi bi-bar-chart-fill text-success"></i> 各产品销量排行</h5>
-          <div id="chart-product-sales" style="height:320px;"></div>
+          <div class="chart-scroll" id="sales-chart-wrapper">
+            <div id="chart-product-sales"></div>
+          </div>
+          <small class="text-muted mt-1" id="sales-chart-hint"></small>
         </div>
       </div>
       <div class="col-lg-5">
         <div class="card p-3 h-100">
           <h5><i class="bi bi-table text-primary"></i> 供需对比</h5>
-          <div id="chart-supply-demand" style="height:320px;"></div>
+          <div class="chart-scroll" id="sd-chart-wrapper">
+            <div id="chart-supply-demand"></div>
+          </div>
+          <small class="text-muted mt-1" id="sd-chart-hint"></small>
         </div>
       </div>
     </div>
@@ -89,9 +98,9 @@
     <!-- 需求详情表格 -->
     <div class="card p-3 mb-4">
       <h5><i class="bi bi-list-check text-info"></i> 产品供需详情</h5>
-      <div class="table-responsive">
+      <div class="table-responsive" style="max-height:500px; overflow-y:auto;">
         <table class="table table-sm table-hover mb-0">
-          <thead>
+          <thead style="position:sticky; top:0; background:white; z-index:1;">
             <tr>
               <th>产品</th>
               <th>已销量</th>
@@ -127,6 +136,7 @@ function escapeHtml(value) {
     "'": '&#39;'
   }[ch]));
 }
+
 
 function initChart(id) {
   const dom = document.getElementById(id);
@@ -188,39 +198,68 @@ fetch('/api/analysis/demand/')
       aiBox.textContent = aiText;
     }
 
-    // 产品销量排行
-    const salesChart = initChart('chart-product-sales');
-    if (salesChart && data.regional_demand_top) {
-      const names = data.regional_demand_top.map(d => d.product);
-      const values = data.regional_demand_top.map(d => d.sold);
-      salesChart.setOption({
-        tooltip: { trigger: 'axis' },
-        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-        xAxis: { type: 'category', data: names, axisLabel: { rotate: 20 } },
-        yAxis: { type: 'value', name: '销量' },
-        series: [{
-          type: 'bar',
-          data: values.map(v => ({ value: v, itemStyle: { color: v > 0 ? '#2d8a4e' : '#ccc' } })),
-          barWidth: '50%',
-          label: { show: true, position: 'top' }
-        }]
-      });
+    // ===== 产品销量排行（横向柱状图，支持滚动） =====
+    const salesData = data.regional_demand_top || [];
+    if (salesData.length > 0) {
+      // 按销量降序排列
+      salesData.sort((a, b) => b.sold - a.sold);
+      const names = salesData.map(d => d.product);
+      const values = salesData.map(d => d.sold);
+
+      const chartH = Math.max(320, salesData.length * BAR_HEIGHT + 40);
+      document.getElementById('chart-product-sales').style.height = chartH + 'px';
+      document.getElementById('sales-chart-hint').textContent =
+        `共 ${salesData.length} 个产品，向下滚动查看更多`;
+
+      const salesChart = initChart('chart-product-sales');
+      if (salesChart) {
+        salesChart.setOption({
+          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+          grid: { left: '3%', right: '8%', top: '2%', bottom: '2%', containLabel: true },
+          xAxis: { type: 'value', name: '销量', axisLabel: { fontSize: 11 } },
+          yAxis: {
+            type: 'category', data: names, inverse: true,
+            axisLabel: { fontSize: 11, width: 80, overflow: 'truncate' }
+          },
+          series: [{
+            type: 'bar',
+            data: values.map(v => ({ value: v, itemStyle: { color: v > 0 ? '#2d8a4e' : '#ccc' } })),
+            barWidth: '60%',
+            label: { show: true, position: 'right', fontSize: 11 }
+          }]
+        });
+      }
     }
 
-    // 供需对比
-    const sdChart = initChart('chart-supply-demand');
-    if (sdChart && data.product_supply_demand) {
-      const pnames = data.product_supply_demand.map(d => d.product);
-      sdChart.setOption({
-        tooltip: { trigger: 'axis' },
-        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
-        xAxis: { type: 'category', data: pnames, axisLabel: { rotate: 20 } },
-        yAxis: { type: 'value', name: '数量' },
-        series: [
-          { name: '已售', type: 'bar', data: data.product_supply_demand.map(d => d.sold), itemStyle: { color: '#3498db' } },
-          { name: '可用', type: 'bar', data: data.product_supply_demand.map(d => d.available), itemStyle: { color: '#2ecc71' } }
-        ]
-      });
+    // ===== 供需对比（横向分组柱状图，支持滚动） =====
+    const sdData = data.product_supply_demand || [];
+    if (sdData.length > 0) {
+      const pnames = sdData.map(d => d.product);
+
+      const chartH = Math.max(320, sdData.length * BAR_HEIGHT + 40);
+      document.getElementById('chart-supply-demand').style.height = chartH + 'px';
+      document.getElementById('sd-chart-hint').textContent =
+        `共 ${sdData.length} 个产品，向下滚动查看更多`;
+
+      const sdChart = initChart('chart-supply-demand');
+      if (sdChart) {
+        sdChart.setOption({
+          tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+          grid: { left: '3%', right: '4%', top: '2%', bottom: '2%', containLabel: true },
+          legend: { data: ['已售', '可用'], top: 0 },
+          xAxis: { type: 'value', name: '数量', axisLabel: { fontSize: 11 } },
+          yAxis: {
+            type: 'category', data: pnames, inverse: true,
+            axisLabel: { fontSize: 11, width: 80, overflow: 'truncate' }
+          },
+          series: [
+            { name: '已售', type: 'bar', data: sdData.map(d => d.sold),
+              itemStyle: { color: '#3498db' }, barWidth: '40%' },
+            { name: '可用', type: 'bar', data: sdData.map(d => d.available),
+              itemStyle: { color: '#2ecc71' }, barWidth: '40%' }
+          ]
+        });
+      }
     }
 
     // 供需表格（多状态）

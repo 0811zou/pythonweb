@@ -23,6 +23,13 @@ class ProductBatchListSerializer(serializers.ModelSerializer):
 
 class ProductSerializer(serializers.ModelSerializer):
     batches = ProductBatchListSerializer(many=True, read_only=True)
+    farmer_address = serializers.SerializerMethodField()
+
+    def get_farmer_address(self, obj):
+        if obj.farmer and obj.farmer.address:
+            return obj.farmer.address
+        return ''
+
     class Meta:
         model = Product
         fields = '__all__'
@@ -117,3 +124,20 @@ class ReviewSerializer(serializers.ModelSerializer):
         model = Review
         fields = '__all__'
         read_only_fields = ['buyer', 'farmer', 'created_at']
+
+
+class ReviewDetailSerializer(serializers.ModelSerializer):
+    """只读评价序列化器 — 含用户名"""
+    buyer_name = serializers.CharField(source='buyer.username', read_only=True)
+    product_name = serializers.SerializerMethodField()
+
+    def get_product_name(self, obj):
+        first_item = obj.order.items.first()
+        if first_item and first_item.product_batch:
+            return first_item.product_batch.product.name
+        return ''
+
+    class Meta:
+        model = Review
+        fields = ['id', 'order', 'buyer_name', 'product_name', 'rating', 'comment', 'created_at']
+        read_only_fields = ['id', 'created_at', 'buyer_name', 'product_name']
