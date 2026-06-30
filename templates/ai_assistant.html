@@ -1,0 +1,352 @@
+{% extends base_template %}
+{% block title %}AI 智能问答 - 智农溯源{% endblock %}
+
+{% block extra_head %}
+<style>
+.ai-chat-container {
+  max-width: 720px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 160px);
+  min-height: 500px;
+}
+/* header */
+.ai-chat-header {
+  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+  border-radius: 16px 16px 0 0;
+  padding: 20px 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.ai-chat-header h4 { color: #2d8a4e; font-weight: 700; margin-bottom: 4px; }
+.ai-chat-header .ai-status { font-size: 0.8rem; }
+.ai-status.online { color: #2d8a4e; }
+.ai-status.offline { color: #999; }
+.ai-status .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; }
+.ai-status .dot.green { background: #2d8a4e; animation: pulse-dot 2s infinite; }
+.ai-status .dot.gray { background: #999; }
+@keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+/* messages area */
+.ai-chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  background: #fafbfc;
+  border-left: 1px solid #eee;
+  border-right: 1px solid #eee;
+}
+.ai-chat-messages::-webkit-scrollbar { width: 6px; }
+.ai-chat-messages::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+
+/* message bubbles */
+.chat-msg {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  animation: msgIn .25s ease-out;
+}
+@keyframes msgIn { from{opacity:0;translateY(8px)} to{opacity:1;translateY(0)} }
+.chat-msg.user { flex-direction: row-reverse; }
+.chat-msg .avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.1rem; flex-shrink: 0;
+}
+.chat-msg.ai .avatar { background: #e8f5e9; color: #2d8a4e; }
+.chat-msg.user .avatar { background: #e3f2fd; color: #1976d2; }
+.chat-msg .bubble {
+  max-width: 78%;
+  padding: 10px 15px;
+  border-radius: 16px;
+  line-height: 1.65;
+  font-size: 0.92rem;
+  white-space: pre-line;
+  word-break: break-word;
+}
+.chat-msg.ai .bubble { background: #fff; border: 1px solid #e0e0e0; border-top-left-radius: 4px; }
+.chat-msg.user .bubble { background: #e3f2fd; border-top-right-radius: 4px; }
+.chat-msg .bubble .model-badge {
+  display: inline-block; font-size: 0.7rem; color: #999; margin-top: 6px;
+}
+
+/* typing indicator */
+.typing-indicator {
+  display: flex; gap: 10px; margin-bottom: 16px;
+}
+.typing-indicator .bubble {
+  background: #fff; border: 1px solid #e0e0e0; border-radius: 16px;
+  border-top-left-radius: 4px; padding: 12px 18px;
+}
+.typing-dots span {
+  display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+  background: #bbb; margin: 0 2px;
+  animation: dotBounce 1.4s infinite ease-in-out both;
+}
+.typing-dots span:nth-child(1) { animation-delay: 0s; }
+.typing-dots span:nth-child(2) { animation-delay: .16s; }
+.typing-dots span:nth-child(3) { animation-delay: .32s; }
+@keyframes dotBounce { 0%,80%,100%{transform:scale(.6)} 40%{transform:scale(1)} }
+
+/* suggested questions */
+.suggested-questions {
+  display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 24px;
+  background: #fff; border-bottom: 1px solid #eee;
+}
+.suggested-questions .sq-btn {
+  font-size: 0.82rem; padding: 5px 14px; border-radius: 20px;
+  border: 1px solid #c8e6c9; background: #f1f8e9; color: #2d8a4e;
+  cursor: pointer; transition: all .15s;
+}
+.suggested-questions .sq-btn:hover { background: #c8e6c9; border-color: #2d8a4e; }
+
+/* input area */
+.ai-chat-input-area {
+  background: #fff; border: 1px solid #eee; border-top: none;
+  border-radius: 0 0 16px 16px; padding: 14px 20px; flex-shrink: 0;
+}
+.ai-chat-input-area form { display: flex; gap: 10px; align-items: flex-end; }
+.ai-chat-input-area textarea {
+  flex: 1; border: 1px solid #ddd; border-radius: 12px; padding: 10px 14px;
+  font-size: 0.9rem; resize: none; outline: none; font-family: inherit;
+  max-height: 100px; line-height: 1.5;
+}
+.ai-chat-input-area textarea:focus { border-color: #2d8a4e; box-shadow: 0 0 0 3px rgba(45,138,78,.1); }
+.ai-chat-input-area .send-btn {
+  width: 44px; height: 44px; border-radius: 50%; border: none;
+  background: #2d8a4e; color: #fff; font-size: 1.2rem;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background .15s; flex-shrink: 0;
+}
+.ai-chat-input-area .send-btn:hover { background: #1b6b32; }
+.ai-chat-input-area .send-btn:disabled { background: #aaa; cursor: not-allowed; }
+.clear-chat-btn { font-size: 0.78rem; color: #999; cursor: pointer; background: none; border: none; padding: 4px 8px; }
+.clear-chat-btn:hover { color: #e74c3c; }
+
+/* responsive */
+@media (max-width: 576px) {
+  .ai-chat-container { height: calc(100vh - 120px); border-radius: 0; }
+  .ai-chat-header { border-radius: 0; padding: 14px 16px; }
+  .ai-chat-messages { padding: 12px 12px; }
+  .ai-chat-input-area { border-radius: 0; padding: 10px 12px; }
+  .chat-msg .bubble { max-width: 85%; font-size: 0.88rem; }
+}
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="ai-chat-container">
+  <!-- header -->
+  <div class="ai-chat-header">
+    <h4><i class="bi bi-cpu"></i> 🤖 AI 智能问答助手 · 小智</h4>
+    <p class="text-muted mb-1 small">免费农业技术咨询，种植/施肥/病虫害/储存…随便问！</p>
+    <span class="ai-status online" id="ai-status-online"><span class="dot green"></span>AI 模型在线（Ollama qwen2.5:7b · 免费本地运行）</span>
+    <span class="ai-status offline d-none" id="ai-status-offline"><span class="dot gray"></span>AI 模型离线 · 使用本地知识库回答</span>
+  </div>
+
+  <!-- suggested questions -->
+  <div class="suggested-questions" id="suggested-qs">
+    <span class="small text-muted me-2" style="line-height:2;">💡 试试问：</span>
+    <button class="sq-btn" data-q="水稻抽穗期怎么施肥？">水稻抽穗期怎么施肥？</button>
+    <button class="sq-btn" data-q="苹果树叶子发黄怎么办？">苹果树叶子发黄怎么办？</button>
+    <button class="sq-btn" data-q="大棚蔬菜怎么防治蚜虫？">大棚蔬菜怎么防治蚜虫？</button>
+    <button class="sq-btn" data-q="有机蔬菜怎么认证？">有机蔬菜怎么认证？</button>
+    <button class="sq-btn" data-q="辣椒烂根是什么原因？">辣椒烂根是什么原因？</button>
+  </div>
+
+  <!-- messages -->
+  <div class="ai-chat-messages" id="chat-messages">
+    <div class="chat-msg ai">
+      <div class="avatar"><i class="bi bi-cpu"></i></div>
+      <div class="bubble">
+👋 您好！我是<strong>小智</strong>，您的农业技术助手。
+
+我可以帮您解答：
+🌱 种植技术 · 🐛 病虫害防治 · 💧 施肥灌溉
+📦 储存保鲜 · 🌍 土壤改良 · 🏠 大棚管理
+📋 有机认证 · 🚜 农机使用 · 💰 农产品销售
+
+请问有什么可以帮您的？
+      </div>
+    </div>
+  </div>
+
+  <!-- input -->
+  <div class="ai-chat-input-area">
+    <form id="chat-form" autocomplete="off">
+      <textarea id="chat-input" rows="1" placeholder="输入您的问题，例如：西红柿晚疫病怎么防治？" maxlength="500"></textarea>
+      <button type="submit" class="send-btn" id="send-btn" title="发送"><i class="bi bi-send-fill"></i></button>
+    </form>
+    <div class="d-flex justify-content-between mt-2">
+      <small class="text-muted">按 Enter 发送，Shift+Enter 换行</small>
+      <button class="clear-chat-btn" id="clear-chat-btn" title="清除对话"><i class="bi bi-trash"></i> 清除对话</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function() {
+  const msgContainer = document.getElementById('chat-messages');
+  const chatForm = document.getElementById('chat-form');
+  const chatInput = document.getElementById('chat-input');
+  const sendBtn = document.getElementById('send-btn');
+  const statusOnline = document.getElementById('ai-status-online');
+  const statusOffline = document.getElementById('ai-status-offline');
+  const suggestedQs = document.getElementById('suggested-qs');
+  const clearBtn = document.getElementById('clear-chat-btn');
+
+  // conversation history (role + content pairs)
+  let history = [];
+  let isWaiting = false;
+
+  // suggested question click
+  suggestedQs.addEventListener('click', function(e) {
+    const btn = e.target.closest('.sq-btn');
+    if (!btn) return;
+    chatInput.value = btn.dataset.q;
+    chatInput.focus();
+    sendMessage();
+  });
+
+  // form submit
+  chatForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    sendMessage();
+  });
+
+  // Enter to send, Shift+Enter to newline
+  chatInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+
+  // auto-resize textarea
+  chatInput.addEventListener('input', function() {
+    this.style.height = 'auto';
+    this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+  });
+
+  // clear chat
+  clearBtn.addEventListener('click', function() {
+    history = [];
+    msgContainer.innerHTML = '';
+    // re-add welcome
+    msgContainer.innerHTML = `<div class="chat-msg ai">
+      <div class="avatar"><i class="bi bi-cpu"></i></div>
+      <div class="bubble">👋 对话已清除。有什么新问题吗？</div>
+    </div>`;
+  });
+
+  function addMessage(role, text, model) {
+    const div = document.createElement('div');
+    div.className = 'chat-msg ' + role;
+    const avatarIcon = role === 'user' ? 'bi bi-person-fill' : 'bi bi-cpu';
+    let bubbleHTML = escapeHtml(text);
+    if (model) {
+      bubbleHTML += `<div class="model-badge">🤖 ${escapeHtml(model)}</div>`;
+    }
+    div.innerHTML = `
+      <div class="avatar"><i class="${avatarIcon}"></i></div>
+      <div class="bubble">${bubbleHTML}</div>`;
+    msgContainer.appendChild(div);
+    msgContainer.scrollTop = msgContainer.scrollHeight;
+  }
+
+  function showTyping() {
+    const div = document.createElement('div');
+    div.className = 'typing-indicator';
+    div.id = 'typing-indicator';
+    div.innerHTML = `<div class="avatar" style="width:36px;height:36px;border-radius:50%;background:#e8f5e9;color:#2d8a4e;display:flex;align-items:center;justify-content:center;font-size:1.1rem;"><i class="bi bi-cpu"></i></div>
+      <div class="bubble"><div class="typing-dots"><span></span><span></span><span></span></div></div>`;
+    msgContainer.appendChild(div);
+    msgContainer.scrollTop = msgContainer.scrollHeight;
+  }
+
+  function hideTyping() {
+    const el = document.getElementById('typing-indicator');
+    if (el) el.remove();
+  }
+
+  function setSending(disabled) {
+    isWaiting = disabled;
+    sendBtn.disabled = disabled;
+    chatInput.disabled = disabled;
+    if (disabled) {
+      sendBtn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+    } else {
+      sendBtn.innerHTML = '<i class="bi bi-send-fill"></i>';
+    }
+  }
+
+  function escapeHtml(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function sendMessage() {
+    if (isWaiting) return;
+    const question = chatInput.value.trim();
+    if (!question) return;
+    if (question.length > 500) {
+      alert('问题不能超过500字');
+      return;
+    }
+
+    // add user message
+    addMessage('user', question);
+    history.push({ role: 'user', content: question });
+
+    // clear input
+    chatInput.value = '';
+    chatInput.style.height = 'auto';
+    setSending(true);
+    showTyping();
+
+    fetch('/api/ai/chat/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+      body: JSON.stringify({ question: question, history: history.slice(0, -1) })
+    })
+    .then(r => r.json())
+    .then(data => {
+      hideTyping();
+      if (data.error) {
+        addMessage('ai', '⚠️ ' + data.error);
+      } else {
+        addMessage('ai', data.answer, data.model || null);
+        history.push({ role: 'assistant', content: data.answer });
+        // update status
+        if (data.model) {
+          statusOnline.classList.remove('d-none');
+          statusOffline.classList.add('d-none');
+        } else {
+          statusOnline.classList.add('d-none');
+          statusOffline.classList.remove('d-none');
+        }
+      }
+      setSending(false);
+      chatInput.focus();
+    })
+    .catch(err => {
+      hideTyping();
+      addMessage('ai', '⚠️ 网络请求失败，请检查网络连接后重试。');
+      setSending(false);
+    });
+  }
+
+  // CSRF token helper
+  function getCookie(name) {
+    let value = '; ' + document.cookie;
+    let parts = value.split('; ' + name + '=');
+    if (parts.length === 2) return parts.pop().split(';').shift();
+    return '';
+  }
+})();
+</script>
+{% endblock %}

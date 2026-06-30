@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"C:\\\\Users\\\\22923\\\\.claude\\\\projects\\\\d--pythonweb---pythonweb\\\\memory\\\\\" 2>nul)",
+      "PowerShell($file = \"C:\\\\Users\\\\22923\\\\.claude\\\\history.jsonl\"; if \\(Test-Path $file\\) { $size = \\(Get-Item $file\\).Length; $lines = \\(Get-Content $file -TotalCount 1\\); Write-Output \"Size: $size bytes\"; Write-Output \"Total lines: $\\(\\(Get-Content $file | Measure-Object -Line\\).Lines\\)\"; Write-Output \"First entry: $\\($lines[0].Substring\\(0, [Math]::Min\\(200, $lines[0].Length\\)\\)\\)\" } else { Write-Output \"history.jsonl not found\" })"
+    ]
+  }
+}

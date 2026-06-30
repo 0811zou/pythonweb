@@ -1,84 +1,60 @@
-{% extends 'base.html' %}
-{% block title %}订单管理 - 智溯农链{% endblock %}
-{% block content %}
-<div class="container-fluid py-4">
-  <div class="row">
-    <div class="col-md-2 mb-3">
-      <div class="farmer-sidebar">
-        <div class="text-center mb-3 pb-2 border-bottom">
-          <div style="width:56px;height:56px;border-radius:50%;background:#e8f5e9;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:#2d8a4e;margin:0 auto 8px;">
-            <i class="bi bi-person-circle"></i>
-          </div>
-          <h6 class="fw-bold mb-0">{{ user.username }}</h6>
-          <small class="text-muted">农户</small>
-        </div>
-        <nav class="nav flex-column">
-          <a class="nav-link" href="{% url 'farmer_dashboard' %}"><i class="bi bi-speedometer2"></i> 工作台</a>
-          <a class="nav-link" href="{% url 'farmer_batch_list' %}"><i class="bi bi-box-seam"></i> 批次管理</a>
-          <a class="nav-link" href="{% url 'farmer_product_create' %}"><i class="bi bi-gear"></i> 管理产品</a>
-          <a class="nav-link active" href="{% url 'farmer_orders' %}"><i class="bi bi-receipt"></i> 订单管理</a>
-          <a class="nav-link" href="{% url 'market_analysis' %}"><i class="bi bi-graph-up-arrow"></i> 市场分析</a>
-        </nav>
-      </div>
-    </div>
-    <div class="col-md-10">
-      <h4 class="fw-bold mb-4"><i class="bi bi-receipt text-success"></i> 订单管理</h4>
+{% extends 'farmer/base.html' %}
+{% block title %}订单管理 - 智农溯源{% endblock %}
+{% block body %}
+<h4 class="fw-bold mb-4"><i class="bi bi-receipt text-success"></i> 订单管理</h4>
 
-      {% if orders %}
-        {% for order in orders %}
-        <div class="card mb-3">
-          <div class="card-header d-flex justify-content-between align-items-center">
-            <span>
-              <strong>订单 #{{ order.id }}</strong>
-              <small class="text-muted ms-2">买家: {{ order.buyer.username }}</small>
-            </span>
-            <span class="badge {% if order.status == 'delivered' %}bg-success{% elif order.status == 'cancelled' %}bg-danger{% elif order.status == 'pending' %}bg-warning text-dark{% else %}bg-info{% endif %}">
-              {{ order.get_status_display }}
-            </span>
-          </div>
-          <div class="card-body">
-            <div class="row">
-              <div class="col-md-8">
-                {% for item in order.items.all %}
-                  <div class="d-flex align-items-center gap-3 mb-2">
-                    <div style="width:48px;height:48px;border-radius:8px;background:#e8f5e9;display:flex;align-items:center;justify-content:center;color:#2d8a4e;">
-                      <i class="bi bi-basket"></i>
-                    </div>
-                    <div>
-                      <strong>{{ item.product_batch.product.name }}</strong>
-                      <small class="text-muted d-block">¥{{ item.price }} × {{ item.quantity }}</small>
-                    </div>
-                  </div>
-                {% endfor %}
+{% if orders %}
+  {% for order in orders %}
+  <div class="card mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>
+        <strong>订单 #{{ order.id }}</strong>
+        <small class="text-muted ms-2">买家: {{ order.buyer.username }}</small>
+      </span>
+      <span class="badge {% if order.status == 'delivered' %}bg-success{% elif order.status == 'cancelled' %}bg-danger{% elif order.status == 'pending' %}bg-warning text-dark{% else %}bg-info{% endif %}">
+        {{ order.get_status_display }}
+      </span>
+    </div>
+    <div class="card-body">
+      <div class="row">
+        <div class="col-md-8">
+          {% for item in order.items.all %}
+            <div class="d-flex align-items-center gap-3 mb-2">
+              <div style="width:48px;height:48px;border-radius:8px;background:#e8f5e9;display:flex;align-items:center;justify-content:center;color:#2d8a4e;">
+                <i class="bi bi-basket"></i>
               </div>
-              <div class="col-md-4 text-md-end">
-                <div class="fw-bold text-success">合计: ¥{{ order.total_amount }}</div>
-                <small class="text-muted d-block">{{ order.created_at|date:'Y-m-d H:i' }}</small>
-                <small class="text-muted">收货地: {{ order.address|truncatechars:20 }}</small>
+              <div>
+                <strong>{{ item.product_batch.product.name }}</strong>
+                <small class="text-muted d-block">¥{{ item.price }} × {{ item.quantity }}</small>
               </div>
             </div>
-            {% if order.tracking_number %}
-            <div class="mt-2 pt-2 border-top small text-muted">
-              <i class="bi bi-truck"></i> 快递单号：<code>{{ order.tracking_number }}</code>
-              {% if order.shipped_at %} · 发货时间：{{ order.shipped_at|date:'m-d H:i' }}{% endif %}
-            </div>
-            {% endif %}
-          </div>
-          {% if order.status == 'confirmed' or order.status == 'paid_offline' %}
-          <div class="card-footer bg-white text-end">
-            <a href="{% url 'farmer_set_tracking' order.id %}" class="btn btn-sm btn-success"><i class="bi bi-truck"></i> 发货</a>
-          </div>
-          {% endif %}
+          {% endfor %}
         </div>
-        {% endfor %}
-      {% else %}
-        <div class="text-center py-5 text-muted">
-          <i class="bi bi-inbox" style="font-size:3rem;display:block;margin-bottom:12px;"></i>
-          <p>暂无订单</p>
-          <p class="small">当有消费者下单您的产品时，订单会显示在这里</p>
+        <div class="col-md-4 text-md-end">
+          <div class="fw-bold text-success">合计: ¥{{ order.total_amount }}</div>
+          <small class="text-muted d-block">{{ order.created_at|date:'Y-m-d H:i' }}</small>
+          <small class="text-muted">收货地: {{ order.address|truncatechars:20 }}</small>
         </div>
+      </div>
+      {% if order.tracking_number %}
+      <div class="mt-2 pt-2 border-top small text-muted">
+        <i class="bi bi-truck"></i> 快递单号：<code>{{ order.tracking_number }}</code>
+        {% if order.shipped_at %} · 发货时间：{{ order.shipped_at|date:'m-d H:i' }}{% endif %}
+      </div>
       {% endif %}
     </div>
+    {% if order.status == 'confirmed' or order.status == 'paid_offline' %}
+    <div class="card-footer bg-white text-end">
+      <a href="{% url 'trade:farmer_set_tracking' order.id %}" class="btn btn-sm btn-success"><i class="bi bi-truck"></i> 发货</a>
+    </div>
+    {% endif %}
   </div>
-</div>
+  {% endfor %}
+{% else %}
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-inbox" style="font-size:3rem;display:block;margin-bottom:12px;"></i>
+    <p>暂无订单</p>
+    <p class="small">当有消费者下单您的产品时，订单会显示在这里</p>
+  </div>
+{% endif %}
 {% endblock %}

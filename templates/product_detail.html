@@ -1,7 +1,7 @@
-{% extends 'base.html' %}
+{% extends base_template %}
 {% load static %}
 
-{% block title %}{{ product.name }} - 智溯农链{% endblock %}
+{% block title %}{{ product.name }} - 智农溯源{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -79,13 +79,13 @@
 </style>
 {% endblock %}
 
-{% block content %}
+{% block body %}
 <section class="py-4">
   <div class="container">
     <nav aria-label="breadcrumb" class="mb-3">
       <ol class="breadcrumb">
-        <li class="breadcrumb-item"><a href="/">首页</a></li>
-        <li class="breadcrumb-item"><a href="/products/">农产品</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'core:home' %}">首页</a></li>
+        <li class="breadcrumb-item"><a href="{% url 'products:list' %}">农产品</a></li>
         <li class="breadcrumb-item active">{{ product.name }}</li>
       </ol>
     </nav>
@@ -125,9 +125,14 @@
             <p class="text-muted mb-3"><i class="bi bi-flower2"></i> {{ product.variety }}</p>
           {% endif %}
 
-          <div class="price-tag mb-3">
+          <div class="price-tag mb-2">
             ¥{{ product.price|floatformat:2 }}
             <small>/ {{ product.unit|default:'kg' }}</small>
+          </div>
+          <div class="mb-3">
+            <span class="badge bg-success bg-opacity-10 text-success">
+              <i class="bi bi-heart"></i> 农户到手约 ¥{{ product.price|floatformat:2 }}（平台零利润，纯公益助农）
+            </span>
           </div>
 
           <p class="mb-4" style="line-height:1.8;color:#555;">
@@ -137,19 +142,18 @@
           <!-- 操作按钮 -->
           <div class="d-flex gap-2 mb-4">
             {% if user.is_authenticated %}
-              <a href="/order/create/?product={{ product.id }}" class="btn btn-success btn-lg"><i class="bi bi-cart-plus"></i> 立即购买</a>
-              <form method="post" action="{% url 'cart_add' product.id %}" class="d-inline">
+              <a href="{% url 'trade:order_create' %}?product={{ product.id }}" class="btn btn-success btn-lg"><i class="bi bi-cart-plus"></i> 立即购买</a>
+              <form method="post" action="{% url 'trade:cart_add' product.id %}" class="d-inline">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-outline-success btn-lg"><i class="bi bi-cart"></i> 加入购物车</button>
               </form>
-            {% else %}
-              <a href="{% url 'login' %}?next={{ request.path }}" class="btn btn-success btn-lg"><i class="bi bi-cart-plus"></i> 登录后购买</a>
-            {% endif %}
-            {% if user.is_authenticated %}
-              <form method="post" action="{% url 'favorite_toggle' product.id %}" class="d-inline">
+              <form method="post" action="{% url 'trade:favorite_toggle' product.id %}" class="d-inline">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-outline-danger btn-lg"><i class="bi bi-heart"></i></button>
               </form>
+            {% else %}
+              <a href="{% url 'accounts:login'  %}?next={{ request.path }}" class="btn btn-success btn-lg"><i class="bi bi-cart-plus"></i> 登录后购买</a>
+              <a href="{% url 'accounts:login'  %}?next={{ request.path }}" class="btn btn-outline-danger btn-lg"><i class="bi bi-heart"></i> 收藏</a>
             {% endif %}
           </div>
 
@@ -157,7 +161,7 @@
           <div class="d-flex align-items-center gap-3 p-3 bg-light rounded-3 mb-3">
             <div class="farmer-avatar"><i class="bi bi-person"></i></div>
             <div>
-              <a href="{% url 'farmer_shop' product.farmer.id %}" class="text-decoration-none"><strong>{{ product.farmer.user.username|default:'农户' }}</strong></a>
+              <a href="{% url 'accounts:farmer_shop' product.farmer.id %}" class="text-decoration-none"><strong>{{ product.farmer.user.username|default:'农户' }}</strong></a>
               <p class="mb-0 small text-muted">
                 <i class="bi bi-geo-alt"></i> {{ product.farmer.address|default:'地址未填写' }}
               </p>
@@ -171,14 +175,14 @@
               <p class="small text-muted mb-0"><i class="bi bi-arrow-repeat"></i> 加载中…</p>
             </div>
             <div class="text-end mt-1">
-              <a href="/products/{{ product.id }}/batches/" class="small text-success"><i class="bi bi-boxes"></i> 查看全部批次</a>
+              <a href="{% url 'products:batches' product.id %}" class="small text-success"><i class="bi bi-boxes"></i> 查看全部批次</a>
             </div>
           </div>
           </div>
         </div>
       </div>
 
-      <!-- ===== 用户评价 ===== -->
+      <!-- ===== 产品评价 ===== -->
       <div class="row mt-4">
         <div class="col-12">
           <div class="info-card">
@@ -215,63 +219,6 @@
   </div>
 </section>
 
-<!-- 评价区域 -->
-<section class="py-4" style="background: var(--white); border-top: 1px solid #f0f0f0;">
-  <div class="container">
-    <div class="row">
-      <div class="col-lg-8 offset-lg-2">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h4 class="fw-bold mb-0"><i class="bi bi-star-fill text-warning"></i> 用户评价</h4>
-          {% if user.is_authenticated %}
-            <button class="btn btn-outline-warning btn-sm" id="write-review-btn" data-bs-toggle="modal" data-bs-target="#reviewModal">
-              <i class="bi bi-pencil-square"></i> 写评价
-            </button>
-          {% endif %}
-        </div>
-        <div id="reviews-list">
-          <div class="text-center py-4 text-muted"><i class="bi bi-arrow-repeat"></i> 加载中…</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- 评价弹窗 -->
-{% if user.is_authenticated %}
-<div class="modal fade" id="reviewModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title">评价 {{ product.name }}</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <div class="mb-3">
-          <label class="form-label">评分</label>
-          <div id="star-rating" class="d-flex gap-1" style="font-size: 1.8rem; cursor: pointer;">
-            <span data-rating="1"><i class="bi bi-star"></i></span>
-            <span data-rating="2"><i class="bi bi-star"></i></span>
-            <span data-rating="3"><i class="bi bi-star"></i></span>
-            <span data-rating="4"><i class="bi bi-star"></i></span>
-            <span data-rating="5"><i class="bi bi-star"></i></span>
-          </div>
-        </div>
-        <div class="mb-3">
-          <label class="form-label">评价内容 <small class="text-muted">（选填）</small></label>
-          <textarea class="form-control" id="review-comment" rows="3" maxlength="500" placeholder="分享一下您的购买体验…"></textarea>
-        </div>
-        <div id="review-error" class="alert alert-danger d-none"></div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-        <button type="button" class="btn btn-warning" id="submit-review">提交评价</button>
-      </div>
-    </div>
-  </div>
-</div>
-{% endif %}
-
-<!-- CSRF token for AJAX -->
 <div class="d-none">{% csrf_token %}</div>
 {% endblock %}
 
@@ -381,7 +328,9 @@ function loadReviews() {
 
 loadReviews();
 
-if (IS_AUTHENTICATED) {
+const HAS_PURCHASED = {{ has_purchased|yesno:"true,false" }};
+
+if (IS_AUTHENTICATED && HAS_PURCHASED) {
   document.getElementById('review-form-container').classList.remove('d-none');
 }
 

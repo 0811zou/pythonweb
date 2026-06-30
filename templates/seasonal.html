@@ -1,0 +1,83 @@
+{% extends base_template %}
+{% block title %}时令推荐 - 智农溯源{% endblock %}
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+{% endblock %}
+{% block body %}
+<div class="container py-4">
+  <div class="text-center mb-4">
+    <span style="font-size:2.5rem;">🍃</span>
+    <h2 class="section-title mt-2">时令推荐</h2>
+    <p class="section-subtitle">应季而食，不时不食。每个季节都有最新鲜的选择</p>
+  </div>
+
+  <!-- 时令日历概览 -->
+  <div class="row g-3 mb-4" id="seasonal-stats">
+    <div class="col-md-6">
+      <div class="card bg-success bg-opacity-10 border-0">
+        <div class="card-body text-center py-4">
+          <h1 class="fw-bold text-success mb-0" id="current-season-text">加载中...</h1>
+          <p class="text-muted mb-0">当前时令</p>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card bg-warning bg-opacity-10 border-0">
+        <div class="card-body text-center py-4">
+          <h1 class="fw-bold text-warning mb-0" id="seasonal-count">-</h1>
+          <p class="text-muted mb-0">当季产品</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 产品网格 -->
+  <div class="row g-4" id="seasonal-products">
+    <div class="col-12 text-center py-4"><div class="spinner-border text-success" role="status"></div></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+function escapeHtml(v) { return String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch])); }
+const catIcon = {'水果':'apple','蔬菜':'flower1','茶叶':'cup-hot','粮油':'droplet','干货':'basket','畜禽':'egg'};
+const catColors = {'水果':'#ff6b6b','蔬菜':'#51cf66','茶叶':'#845ef7','粮油':'#fcc419','干货':'#e8590c','畜禽':'#339af0'};
+
+function productCard(p, badge) {
+  const icon = catIcon[p.category] || 'basket';
+  const color = catColors[p.category] || '#2d8a4e';
+  const imgUrl = p.image || '';
+  return `<div class="col-lg-3 col-md-4 col-6">
+    <div class="card h-100 position-relative">
+      ${badge ? `<span class="position-absolute top-0 start-0 badge bg-${badge.bg} m-2">${badge.text}</span>` : ''}
+      ${imgUrl ? `<img src="${escapeHtml(imgUrl)}" class="card-img-top" style="height:160px;object-fit:cover;" alt="${escapeHtml(p.name)}">` :
+      `<div class="card-img-top d-flex align-items-center justify-content-center" style="height:160px;background:${color}15;font-size:2.8rem;color:${color};"><i class="bi bi-${icon}"></i></div>`}
+      <div class="card-body d-flex flex-column">
+        <span class="badge-trace mb-1" style="align-self:flex-start;background:${color}20;color:${color};">${escapeHtml(p.category||'农产品')}</span>
+        <h5 class="card-title">${escapeHtml(p.name)}</h5>
+        <p class="small text-muted mb-1"><i class="bi bi-geo-alt"></i> ${escapeHtml(p.variety||'原产地直供')}</p>
+        <span class="fw-bold" style="color:${color};">¥${Number.parseFloat(p.price).toFixed(2)}<small>/${escapeHtml(p.unit||'kg')}</small></span>
+        <a href="/products/${p.id}/" class="btn btn-sm btn-outline-success mt-2">详情</a>
+      </div>
+    </div>
+  </div>`;
+}
+
+fetch('/api/products/seasonal/')
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById('current-season-text').textContent = data.current_season || '当季';
+    document.getElementById('seasonal-count').textContent = (data.products || []).length;
+    const grid = document.getElementById('seasonal-products');
+    if (data.products && data.products.length) {
+      grid.innerHTML = data.products.map(p => productCard(p, {text: data.current_season||'当季', bg: 'success'})).join('');
+    } else {
+      grid.innerHTML = '<div class="col-12 text-center py-5 text-muted"><i class="bi bi-inbox" style="font-size:3rem;"></i><p>暂无当季产品</p></div>';
+    }
+  })
+  .catch(() => {
+    document.getElementById('seasonal-products').innerHTML = '<div class="col-12 text-center py-5 text-muted">加载失败</div>';
+  });
+</script>
+{% endblock %}

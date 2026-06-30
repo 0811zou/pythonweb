@@ -1,35 +1,70 @@
-{% extends 'base.html' %}
-{% block title %}消息通知 - 智溯农链{% endblock %}
-{% block content %}
+{% extends base_template %}
+{% block title %}消息通知 - 智农溯源{% endblock %}
+{% block body %}
 <div class="container py-4" style="max-width: 800px;">
-  <div class="d-flex justify-content-between align-items-center mb-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
     <h4 class="fw-bold mb-0"><i class="bi bi-bell text-success"></i> 消息通知</h4>
-    {% if notifications %}
-    <a href="?mark_read=all" class="btn btn-outline-success btn-sm"><i class="bi bi-check-all"></i> 全部已读</a>
-    {% endif %}
+    <div class="d-flex gap-2">
+      {% if notifications %}
+      <a href="?mark_read=all{% if type_filter %}&type={{ type_filter }}{% endif %}" class="btn btn-outline-success btn-sm"><i class="bi bi-check-all"></i> 全部已读</a>
+      <a href="?clear_read=all{% if type_filter %}&type={{ type_filter }}{% endif %}" class="btn btn-outline-danger btn-sm" onclick="return confirm('确定删除所有已读通知？此操作不可撤销。')"><i class="bi bi-trash"></i> 清空已读</a>
+      {% endif %}
+    </div>
   </div>
+
+  {# 类型筛选标签 #}
+  <div class="d-flex gap-2 mb-3">
+    <a href="?" class="btn btn-sm {% if not type_filter %}btn-success{% else %}btn-outline-success{% endif %}">全部</a>
+    <a href="?type=order" class="btn btn-sm {% if type_filter == 'order' %}btn-primary{% else %}btn-outline-primary{% endif %}"><i class="bi bi-receipt"></i> 订单</a>
+    <a href="?type=batch" class="btn btn-sm {% if type_filter == 'batch' %}btn-success{% else %}btn-outline-success{% endif %}"><i class="bi bi-box-seam"></i> 批次</a>
+    <a href="?type=product" class="btn btn-sm {% if type_filter == 'product' %}btn-warning{% else %}btn-outline-warning{% endif %}"><i class="bi bi-basket"></i> 产品</a>
+    <a href="?type=system" class="btn btn-sm {% if type_filter == 'system' %}btn-info{% else %}btn-outline-info{% endif %}"><i class="bi bi-megaphone"></i> 系统</a>
+  </div>
+
   {% if notifications %}
-  <div class="list-group">
+  <div class="list-group mb-3">
     {% for n in notifications %}
-    <a href="{% if n.link %}{{ n.link }}{% else %}{% url 'notifications_mark_read' n.id %}{% endif %}"
-       class="list-group-item list-group-item-action d-flex gap-3 {% if not n.is_read %}list-group-item-success{% endif %}">
-      <div style="width:40px;text-align:center;font-size:1.4rem;">
+    <div class="list-group-item d-flex gap-3 {% if not n.is_read %}list-group-item-success{% endif %}">
+      <div style="width:40px;text-align:center;font-size:1.4rem;flex-shrink:0;">
         {% if n.notification_type == 'order' %}<i class="bi bi-receipt text-primary"></i>
         {% elif n.notification_type == 'batch' %}<i class="bi bi-box-seam text-success"></i>
         {% elif n.notification_type == 'product' %}<i class="bi bi-basket text-warning"></i>
         {% else %}<i class="bi bi-megaphone text-info"></i>{% endif %}
       </div>
-      <div class="flex-grow-1">
+      <a href="{% if n.link %}{{ n.link }}{% else %}{% url 'notifications:mark_read' n.id %}{% endif %}"
+         class="flex-grow-1 text-decoration-none text-dark">
         <div class="d-flex justify-content-between">
           <strong>{{ n.title }}</strong>
           <small class="text-muted">{{ n.created_at|date:'m-d H:i' }}</small>
         </div>
         <p class="mb-0 small text-muted">{{ n.message }}</p>
+      </a>
+      <div class="d-flex align-items-center gap-1 flex-shrink-0">
+        {% if not n.is_read %}<span class="badge bg-success rounded-pill">新</span>{% endif %}
+        <a href="{% url 'notifications:delete' n.id %}" class="btn btn-sm text-danger" title="删除"
+           onclick="return confirm('确定删除这条通知？')"><i class="bi bi-x-lg"></i></a>
       </div>
-      {% if not n.is_read %}<span class="badge bg-success rounded-pill align-self-center">新</span>{% endif %}
-    </a>
+    </div>
     {% endfor %}
   </div>
+
+  {# 分页 #}
+  {% if notifications.paginator.num_pages > 1 %}
+  <nav>
+    <ul class="pagination justify-content-center">
+      {% if notifications.has_previous %}
+      <li class="page-item"><a class="page-link" href="?page=1{% if type_filter %}&type={{ type_filter }}{% endif %}">首页</a></li>
+      <li class="page-item"><a class="page-link" href="?page={{ notifications.previous_page_number }}{% if type_filter %}&type={{ type_filter }}{% endif %}">上一页</a></li>
+      {% endif %}
+      <li class="page-item disabled"><span class="page-link">第 {{ notifications.number }} / {{ notifications.paginator.num_pages }} 页</span></li>
+      {% if notifications.has_next %}
+      <li class="page-item"><a class="page-link" href="?page={{ notifications.next_page_number }}{% if type_filter %}&type={{ type_filter }}{% endif %}">下一页</a></li>
+      <li class="page-item"><a class="page-link" href="?page={{ notifications.paginator.num_pages }}{% if type_filter %}&type={{ type_filter }}{% endif %}">末页</a></li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+
   {% else %}
   <div class="text-center py-5 text-muted">
     <i class="bi bi-bell-slash" style="font-size:3rem;display:block;margin-bottom:12px;"></i>

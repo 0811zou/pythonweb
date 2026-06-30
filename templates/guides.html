@@ -1,0 +1,68 @@
+{% extends base_template %}
+{% block title %}农技知识库 - 智农溯源{% endblock %}
+{% block body %}
+<div class="container py-4">
+  <div class="text-center mb-4">
+    <span style="font-size:2.5rem;">📖</span>
+    <h2 class="section-title mt-2">农技知识库</h2>
+    <p class="section-subtitle">实用的农业技术知识，帮助农户种得更好、卖得更好</p>
+  </div>
+
+  <!-- 分类筛选 -->
+  <div class="d-flex flex-wrap gap-2 justify-content-center mb-4">
+    <a href="?" class="btn btn-sm {% if not current_category %}btn-success{% else %}btn-outline-success{% endif %}">全部</a>
+    <a href="?category=planting" class="btn btn-sm {% if current_category == 'planting' %}btn-success{% else %}btn-outline-success{% endif %}">🌱 种植技术</a>
+    <a href="?category=pest" class="btn btn-sm {% if current_category == 'pest' %}btn-success{% else %}btn-outline-success{% endif %}">🐛 病虫害防治</a>
+    <a href="?category=fertilizer" class="btn btn-sm {% if current_category == 'fertilizer' %}btn-success{% else %}btn-outline-success{% endif %}">💧 施肥管理</a>
+    <a href="?category=harvest" class="btn btn-sm {% if current_category == 'harvest' %}btn-success{% else %}btn-outline-success{% endif %}">🔪 采收储存</a>
+    <a href="?category=storage" class="btn btn-sm {% if current_category == 'storage' %}btn-success{% else %}btn-outline-success{% endif %}">📦 保鲜运输</a>
+  </div>
+
+  <div class="row">
+    <div class="{% if relevant_guides %}col-md-8{% else %}col-md-10 offset-md-1{% endif %}">
+      {% if guides %}
+      <div class="row g-3">
+        {% for g in guides %}
+        <div class="col-lg-4 col-md-6">
+          <a href="{% url 'knowledge:detail' g.id %}" class="text-decoration-none">
+            <div class="card h-100 shadow-sm hover-shadow">
+              {% if g.cover_image %}
+              <img src="{{ g.cover_image }}" class="card-img-top" style="height:140px;object-fit:cover;" alt="">
+              {% endif %}
+              <div class="card-body">
+                <span class="badge bg-success mb-2">{{ g.get_category_display }}</span>
+                <span class="badge bg-secondary mb-2">{{ g.get_crop_type_display }}</span>
+                <h6 class="card-title text-dark mt-1">{{ g.title }}</h6>
+                <small class="text-muted">{{ g.created_at|date:'Y-m-d' }}</small>
+              </div>
+            </div>
+          </a>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="text-center py-5 text-muted">
+        <i class="bi bi-book" style="font-size:3rem;display:block;margin-bottom:8px;"></i>
+        <p>暂无知识文章</p>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if relevant_guides %}
+    <div class="col-md-4">
+      <div class="card">
+        <div class="card-header bg-white"><strong><i class="bi bi-lightbulb text-warning"></i> 推荐给你的指南</strong></div>
+        <div class="card-body">
+          {% for g in relevant_guides %}
+          <div class="mb-3 {% if not forloop.last %}border-bottom pb-2{% endif %}">
+            <a href="{% url 'knowledge:detail' g.id %}" class="text-decoration-none"><strong>{{ g.title }}</strong></a>
+            <br><small class="text-muted">{{ g.get_category_display }} · {{ g.get_crop_type_display }}</small>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

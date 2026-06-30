@@ -1,88 +1,58 @@
-{% extends 'base.html' %}
-{% block title %}批次管理 - 智溯农链{% endblock %}
-{% block content %}
-<style>
-.farmer-sidebar { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-.farmer-sidebar .nav-link { border-radius: 8px; padding: 10px 16px; color: #555; transition: all 0.2s; }
-.farmer-sidebar .nav-link:hover { background: #e8f5e9; color: #2d8a4e; }
-.farmer-sidebar .nav-link.active { background: #2d8a4e; color: #fff; }
-</style>
-<div class="container-fluid py-4">
-  <div class="row">
-    <div class="col-md-2 mb-3">
-      <div class="farmer-sidebar">
-        <div class="text-center mb-3 pb-2 border-bottom">
-          <div style="width:56px;height:56px;border-radius:50%;background:#e8f5e9;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:#2d8a4e;margin:0 auto 8px;">
-            <i class="bi bi-person-circle"></i>
-          </div>
-          <h6 class="fw-bold mb-0">{{ user.username }}</h6>
-          <small class="text-muted">农户</small>
-        </div>
-        <nav class="nav flex-column">
-          <a class="nav-link" href="{% url 'farmer_dashboard' %}"><i class="bi bi-speedometer2"></i> 工作台</a>
-          <a class="nav-link active" href="{% url 'farmer_batch_list' %}"><i class="bi bi-box-seam"></i> 批次管理</a>
-          <a class="nav-link" href="{% url 'farmer_product_create' %}"><i class="bi bi-gear"></i> 管理产品</a>
-          <a class="nav-link" href="{% url 'farmer_orders' %}"><i class="bi bi-receipt"></i> 订单管理</a>
-          <a class="nav-link" href="{% url 'market_analysis' %}"><i class="bi bi-graph-up-arrow"></i> 市场分析</a>
-        </nav>
-      </div>
-    </div>
-    <div class="col-md-10">
-      <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4 class="fw-bold mb-0"><i class="bi bi-box-seam text-success"></i> 批次管理</h4>
-        <a href="{% url 'farmer_batch_create' %}" class="btn btn-success"><i class="bi bi-plus-lg"></i> 新建批次</a>
-      </div>
+{% extends 'farmer/base.html' %}
+{% block title %}批次管理 - 智农溯源{% endblock %}
+{% block body %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0"><i class="bi bi-box-seam text-success"></i> 批次管理</h4>
+  <a href="{% url 'products:farmer_batch_create'  %}" class="btn btn-success"><i class="bi bi-plus-lg"></i> 新建批次</a>
+</div>
 
-      {% if messages %}
-        {% for m in messages %}
-          <div class="alert alert-{{ m.tags }} alert-dismissible fade show">{{ m }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
-        {% endfor %}
-      {% endif %}
+{% if messages %}
+  {% for m in messages %}
+    <div class="alert alert-{{ m.tags }} alert-dismissible fade show">{{ m }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>
+  {% endfor %}
+{% endif %}
 
-      {% if batches %}
-      <div class="card">
-        <div class="card-header bg-white"><strong><i class="bi bi-list"></i> 我的批次</strong></div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-hover mb-0">
-              <thead class="table-light">
-                <tr><th>批次编号</th><th>产品</th><th>采收日期</th><th>数量</th><th>状态</th><th>创建时间</th><th>操作</th></tr>
-              </thead>
-              <tbody>
-                {% for b in batches %}
-                <tr>
-                  <td><code>{{ b.batch_code }}</code></td>
-                  <td><strong>{{ b.product.name }}</strong></td>
-                  <td>{{ b.harvest_date|default:'-' }}</td>
-                  <td>{{ b.quantity }}</td>
-                  <td>
-                    {% if b.status == 'approved' %}<span class="badge bg-success">已通过</span>
-                    {% elif b.status == 'pending' %}<span class="badge bg-warning text-dark">待质检</span>
-                    {% elif b.status == 'rejected' %}<span class="badge bg-danger">未通过</span>
-                    {% else %}<span class="badge bg-secondary">草稿</span>{% endif %}
-                  </td>
-                  <td class="small">{{ b.created_at|date:'Y-m-d' }}</td>
-                  <td>
-                    <a href="{% url 'farmer_batch_detail' b.pk %}" class="btn btn-sm btn-outline-success"><i class="bi bi-eye"></i> 详情</a>
-                    {% if b.qr_code %}
-                      <a href="{% url 'download_qr' b.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-download"></i> 二维码</a>
-                    {% endif %}
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-      {% else %}
-      <div class="text-center py-5 text-muted">
-        <i class="bi bi-inbox" style="font-size:3rem;display:block;margin-bottom:12px;"></i>
-        <p>暂无批次记录</p>
-        <a href="{% url 'farmer_batch_create' %}" class="btn btn-success">新建批次</a>
-      </div>
-      {% endif %}
+{% if batches %}
+<div class="card">
+  <div class="card-header bg-white"><strong><i class="bi bi-list"></i> 我的批次</strong></div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr><th>批次编号</th><th>产品</th><th>采收日期</th><th>数量</th><th>状态</th><th>创建时间</th><th>操作</th></tr>
+        </thead>
+        <tbody>
+          {% for b in batches %}
+          <tr>
+            <td><code>{{ b.batch_code|default:'待审核' }}</code></td>
+            <td><strong>{{ b.product.name }}</strong></td>
+            <td>{{ b.harvest_date|default:'-' }}</td>
+            <td>{{ b.quantity }}</td>
+            <td>
+              {% if b.status == 'approved' %}<span class="badge bg-success">已通过</span>
+              {% elif b.status == 'pending' %}<span class="badge bg-warning text-dark">待质检</span>
+              {% elif b.status == 'rejected' %}<span class="badge bg-danger">未通过</span>
+              {% else %}<span class="badge bg-secondary">草稿</span>{% endif %}
+            </td>
+            <td class="small">{{ b.created_at|date:'Y-m-d' }}</td>
+            <td>
+              <a href="{% url 'products:farmer_batch_detail' b.pk %}" class="btn btn-sm btn-outline-success"><i class="bi bi-eye"></i> 详情</a>
+              {% if b.qr_code %}
+                <a href="{% url 'products:download_qr' b.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-download"></i> 二维码</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-inbox" style="font-size:3rem;display:block;margin-bottom:12px;"></i>
+  <p>暂无批次记录</p>
+  <a href="{% url 'products:farmer_batch_create'  %}" class="btn btn-success">新建批次</a>
+</div>
+{% endif %}
 {% endblock %}

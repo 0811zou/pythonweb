@@ -3,7 +3,13 @@ import random
 from datetime import datetime, timedelta
 from django.core.management.base import BaseCommand
 from django.contrib.auth.models import User
-from core.models import Cooperative, FarmerProfile, Product, ProductBatch, Order, OrderItem, Review
+from accounts.models import FarmerProfile
+from products.models import Product, ProductBatch, Review, generate_batch_code
+from trade.models import Order, OrderItem, Cart, CartItem, Favorite
+from marketplace.models import SupplyDemandPost
+from knowledge.models import FarmingGuide
+from preorder.models import PreOrderCampaign
+from core.models import Training
 
 
 class Command(BaseCommand):
@@ -16,34 +22,15 @@ class Command(BaseCommand):
         Order.objects.all().delete()
         OrderItem.objects.all().delete()
         Review.objects.all().delete()
+        SupplyDemandPost.objects.all().delete()
+        FarmingGuide.objects.all().delete()
+        PreOrderCampaign.objects.all().delete()
+        Training.objects.all().delete()
+        Cart.objects.all().delete()
+        CartItem.objects.all().delete()
+        Favorite.objects.all().delete()
 
         now = datetime.now()
-
-        # === 34省合作社 ===
-        coop_defs = [
-            ('京郊绿源合作社', '北京市平谷区'), ('津门生态合作社', '天津市西青区'),
-            ('燕赵农产品合作社', '河北省石家庄市'), ('三晋丰饶合作社', '山西省晋中市'),
-            ('草原牧歌合作社', '内蒙古自治区呼和浩特市'), ('辽河明珠合作社', '辽宁省沈阳市'),
-            ('长白山珍合作社', '吉林省长春市'), ('北大仓合作社', '黑龙江省哈尔滨市'),
-            ('沪上鲜农合作社', '上海市浦东新区'), ('苏韵江南合作社', '江苏省南京市'),
-            ('浙里鲜合作社', '浙江省杭州市'), ('徽乡源合作社', '安徽省合肥市'),
-            ('八闽大地合作社', '福建省福州市'), ('赣鄱绿谷合作社', '江西省南昌市'),
-            ('齐鲁农耕合作社', '山东省济南市'), ('中原粮仓合作社', '河南省郑州市'),
-            ('荆楚鱼米合作社', '湖北省武汉市'), ('湘味源合作社', '湖南省长沙市'),
-            ('岭南佳果合作社', '广东省广州市'), ('壮乡绿野合作社', '广西壮族自治区南宁市'),
-            ('椰岛风情合作社', '海南省海口市'), ('巴渝山珍合作社', '重庆市渝北区'),
-            ('天府之国合作社', '四川省成都市'), ('黔贵生态合作社', '贵州省贵阳市'),
-            ('彩云之南合作社', '云南省昆明市'), ('雪域高原合作社', '西藏自治区拉萨市'),
-            ('三秦大地合作社', '陕西省西安市'), ('陇上人家合作社', '甘肃省兰州市'),
-            ('青海源合作社', '青海省西宁市'), ('塞上江南合作社', '宁夏回族自治区银川市'),
-            ('西域绿洲合作社', '新疆维吾尔自治区乌鲁木齐市'), ('宝岛农会合作社', '台湾省台北市'),
-            ('香江鲜农合作社', '香港特别行政区'), ('澳葡风情合作社', '澳门特别行政区'),
-        ]
-        coops = []
-        for name, region in coop_defs:
-            coop, _ = Cooperative.objects.get_or_create(name=name, defaults={'region': region, 'verified': True})
-            coops.append(coop)
-        self.stdout.write(f'  {len(coops)} 个合作社')
 
         # === 34省农户（get_or_create 保留已有账号密码） ===
         raw_farmers = [
@@ -83,13 +70,13 @@ class Command(BaseCommand):
             ('farmer_mo', 33, '澳门特别行政区路环'),
         ]
         farmers = []
-        for uname, ci, addr in raw_farmers:
+        for uname, _, addr in raw_farmers:
             user, created = User.objects.get_or_create(username=uname, defaults={'email': f'{uname}@test.com'})
             if created:
                 user.set_password('demo123')
                 user.save()
             fp, _ = FarmerProfile.objects.get_or_create(user=user, defaults={
-                'phone': '1380000', 'address': addr, 'verified': True, 'cooperative': coops[ci]
+                'phone': '1380000', 'address': addr, 'verified': True
             })
             farmers.append(fp)
         self.stdout.write(f'  {len(farmers)} 个农户')
@@ -102,13 +89,13 @@ class Command(BaseCommand):
             ('farmer_zhang', 17, '湖南省岳阳市君山区'),
             ('farmer_zhao', 30, '新疆阿克苏地区温宿县'),
         ]
-        for uname, ci, addr in legacy_farmers:
+        for uname, _, addr in legacy_farmers:
             user, created = User.objects.get_or_create(username=uname, defaults={'email': f'{uname}@test.com'})
             if created:
                 user.set_password('demo123')
                 user.save()
             fp, _ = FarmerProfile.objects.get_or_create(user=user, defaults={
-                'phone': '1380000', 'address': addr, 'verified': True, 'cooperative': coops[ci]
+                'phone': '1380000', 'address': addr, 'verified': True
             })
 
         # === 消费者（get_or_create 保留已有账号密码） ===
@@ -118,6 +105,8 @@ class Command(BaseCommand):
             'consumer_zhou', 'consumer_ma', 'consumer_chen',
             'consumer_yang', 'consumer_huang', 'consumer_lin',
             'consumer_xu', 'consumer_he', 'consumer_gao',
+            'consumer_wei', 'consumer_jiang', 'consumer_peng',
+            'consumer_fang', 'consumer_shang',
         ]
         consumers = []
         for name in consumer_names:
@@ -127,6 +116,51 @@ class Command(BaseCommand):
                 user.save()
             consumers.append(user)
         self.stdout.write(f'  {len(consumers)} 个消费者')
+
+        # === 农场故事 + 照片（丰富5个典型农户的店铺页） ===
+        farm_stories_data = [
+            (farmers[7],  # 黑龙江五常
+             '我家三代种植水稻，这片黑土地养育了我们。从爷爷那辈起，我们就坚持传统农耕方式——施农家肥、人工除草、稻鸭共作。'
+             '每年10月，金灿灿的稻穗弯下腰的时候，是一年中最幸福的时刻。我们的大米，每一粒都带着黑土地的诚意。'
+             '欢迎来五常做客，品尝真正的稻花香。',
+             ['https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=600',  # 稻田
+              'https://images.unsplash.com/photo-1536052954887-fd25a05b61e3?w=600',  # 水稻
+              'https://images.unsplash.com/photo-1586444248902-2f64eddc13df?w=600']),  # 农田
+            (farmers[12],  # 福建武夷山
+             '武夷山的云雾里长出来的茶，天生带着岩骨花香。我家的茶园坐落在海拔800米的岩壁间，'
+             '茶树扎根于丹霞地貌的风化岩中，吸收了岩石的矿物质和山间的云雾精华。'
+             '从采摘到炭焙，每一道工序都是祖传手艺。我们不做量产，只做好茶。',
+             ['https://images.unsplash.com/photo-1563822249366-3efb23b8e0c9?w=600',  # 茶园
+              'https://images.unsplash.com/photo-1597318181409-cf64d0b5d8a2?w=600',
+              'https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=600']),
+            (farmers[22],  # 四川郫县
+             '郫县豆瓣，川菜之魂。我家的豆瓣酱选用优质蚕豆和二荆条辣椒，在百年老缸里自然发酵。'
+             '每天翻缸、晒露，365天从不间断。三年陈酿的豆瓣酱，色泽红润、酱香浓郁，是正宗川菜的灵魂。'
+             '我们坚持古法酿造，让每一勺豆瓣酱都能带你回味儿时的川味。',
+             ['https://images.unsplash.com/photo-1571757760251-7ed249121e04?w=600',
+              'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600',
+              'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=600']),
+            (farmers[29],  # 宁夏中卫
+             '宁夏枸杞甲天下，中宁枸杞甲宁夏。我们地处黄河灌区，光照充足、昼夜温差大，'
+             '种出来的枸杞个大、籽少、肉厚、味甜。每一颗都是手工采摘、自然晾晒，'
+             '锁住了枸杞最原始的营养和甘甜。泡一杯枸杞水，红润透亮，是来自塞上江南的健康问候。',
+             ['https://images.unsplash.com/photo-1587132137056-bfbf0166836e?w=600',
+              'https://images.unsplash.com/photo-1571771891175-bfce4c3e8bf6?w=600',
+              'https://images.unsplash.com/photo-1546549032-1f3e0e16bb91?w=600']),
+            (farmers[0],  # 北京平谷
+             '平谷大桃，北京人的夏天记忆。我家桃园位于大华山镇核心产区，沙质土壤、充足光照，'
+             '每一颗桃子都经过精心修剪和套袋保护。从6月到9月，不同品种接力成熟，'
+             '大久保、绿化九、蟠桃……咬一口，甜汁顺着嘴角流下来的幸福感，就是平谷的味道。'
+             '欢迎来桃园采摘，感受京郊田园之乐。',
+             ['https://images.unsplash.com/photo-1551773184-6307854fa8b9?w=600',
+              'https://images.unsplash.com/photo-1523049673857-eb18f1d7b578?w=600',
+              'https://images.unsplash.com/photo-1595981267035-7b04ca84a6fd?w=600']),
+        ]
+        for fp, story, photos in farm_stories_data:
+            fp.farm_story = story
+            fp.farm_photos = photos
+            fp.save(update_fields=['farm_story', 'farm_photos'])
+        self.stdout.write(f'  已为 {len(farm_stories_data)} 个农户添加农场故事和照片')
 
         # === 管理员（确保存在） ===
         admin, created = User.objects.get_or_create(username='demo_admin', defaults={
@@ -294,6 +328,27 @@ class Command(BaseCommand):
             products.append(p)
         self.stdout.write(f'  {len(products)} 个产品（已上架，覆盖{len(set(fi for fi,_,_,_,_,_,_ in product_data))}省）')
 
+        # === 待审核产品（8个，分布在8个不同省份，模拟农户提交上架申请） ===
+        pending_product_data = [
+            (farmers[1], '天津小麻花', '干货', '十八街', 22.0, '盒', '天津传统小吃，酥脆香甜，手工精制'),
+            (farmers[5], '大连海参', '畜禽', '辽参', 388.0, '盒', '辽宁大连特产，底播野生海参，肉质肥厚'),
+            (farmers[9], '太湖翠竹茶叶', '茶叶', '翠竹', 198.0, '盒', '江苏无锡特产，形似翠竹，清香甘甜'),
+            (farmers[14], '山东阿胶', '干货', '东阿', 298.0, '盒', '山东东阿特产，精选驴皮熬制，滋阴补血'),
+            (farmers[18], '新会柑普茶', '茶叶', '小青柑', 128.0, '盒', '广东新会特产，柑普合一，养生佳品'),
+            (farmers[21], '重庆火锅底料', '干货', '麻辣牛油', 25.0, '袋', '重庆特产，正宗牛油火锅底料，麻辣鲜香'),
+            (farmers[26], '兰州鲜百合', '蔬菜', '兰州百合', 42.0, '斤', '甘肃兰州特产，瓣大肉厚，清甜无苦，药食同源'),
+            (farmers[31], '台湾高山茶', '茶叶', '阿里山', 258.0, '盒', '台湾阿里山特产，高山云雾茶，清香回甘'),
+        ]
+        pending_products = []
+        for farmer, name, cat, variety, price, unit, desc in pending_product_data:
+            p = Product.objects.create(
+                farmer=farmer, name=name, category=cat,
+                variety=variety, price=price, unit=unit,
+                description=desc, status='pending'
+            )
+            pending_products.append(p)
+        self.stdout.write(f'  {len(pending_products)} 个待审核产品（管理员后台审批）')
+
         # === 批次（每产品2-5个批次，动态生成） ===
         qc_templates = {
             '蔬菜': [
@@ -357,6 +412,7 @@ class Command(BaseCommand):
             for bi in range(num_batches):
                 b = ProductBatch.objects.create(
                     product=products[idx],
+                    batch_code=generate_batch_code(),
                     quantity=random.randint(30, 250),
                     harvest_date=(now - timedelta(days=random.randint(1, 180))).date(),
                     trace_info={
@@ -365,11 +421,35 @@ class Command(BaseCommand):
                         '批次号': bi + 1,
                     },
                     qc_report=random.choice(qc_list),
+                    status='approved',
                 )
                 batch_list.append(b)
                 total_batches += 1
             batch_map[idx] = batch_list
         self.stdout.write(f'  {total_batches} 个批次（{unsold_count} 个待售产品，每产品2-5批）')
+
+        # === 待审核批次（10个，申请溯源二维码和编码，管理员后台审批） ===
+        pending_batch_count = 0
+        # 从已上架产品中选10个不同省份的产品创建待审核批次
+        pending_batch_candidates = random.sample(range(len(products)), min(10, len(products)))
+        for idx in pending_batch_candidates:
+            product = products[idx]
+            cat = product.category
+            qc_list = qc_templates.get(cat, qc_templates['蔬菜'])
+            b = ProductBatch.objects.create(
+                product=product,
+                quantity=random.randint(50, 200),
+                harvest_date=(now + timedelta(days=random.randint(30, 120))).date(),
+                trace_info={
+                    '产地': product.farmer.address,
+                    '种植方式': random.choice(['有机种植', '绿色种植', '传统种植', '生态种植']),
+                    '批次号': 1,
+                },
+                qc_report=random.choice(qc_list),
+                status='pending',
+            )
+            pending_batch_count += 1
+        self.stdout.write(f'  {pending_batch_count} 个待审核批次（等待管理员审批溯源编码和二维码）')
 
         # === 订单（动态生成，逻辑同前） ===
         regions = [
@@ -465,6 +545,172 @@ class Command(BaseCommand):
                 cnt += 1
         self.stdout.write(f'  {cnt} 条评价')
 
+        # === 购物车（10个消费者各有1-3件商品在购物车中） ===
+        cart_consumers = random.sample(consumers, min(10, len(consumers)))
+        cart_count = 0
+        for user in cart_consumers:
+            cart, _ = Cart.objects.get_or_create(user=user)
+            # 随机选1-3个已上架产品加入购物车
+            cart_products = random.sample(products, random.randint(1, 3))
+            for product in cart_products:
+                CartItem.objects.get_or_create(
+                    cart=cart, product=product,
+                    defaults={'quantity': random.randint(1, 5)}
+                )
+                cart_count += 1
+        self.stdout.write(f'  {len(cart_consumers)} 个购物车（共{ cart_count }件商品）')
+
+        # === 收藏（15个消费者各收藏2-5个产品） ===
+        fav_consumers = random.sample(consumers, min(15, len(consumers)))
+        fav_count = 0
+        for user in fav_consumers:
+            fav_products = random.sample(products, random.randint(2, 5))
+            for product in fav_products:
+                _, created = Favorite.objects.get_or_create(user=user, product=product)
+                if created:
+                    fav_count += 1
+        self.stdout.write(f'  {fav_count} 条收藏（{len(fav_consumers)} 个消费者）')
+
+        # === 农技知识库 ===
+        guide_defs = [
+            ('水稻种植高产技术要点', 'planting', 'rice',
+             '一、选种与育秧\n选择适合当地气候的高产抗病品种。播前浸种消毒，用50℃温水浸泡30分钟。\n\n二、整地与施肥\n深耕20-25cm，每亩施腐熟农家肥2000-3000kg作基肥。\n\n三、水肥管理\n分蘖期保持浅水层(3-5cm)，拔节期适当晒田，抽穗扬花期保持深水(7-10cm)。追肥分三次：返青肥、分蘖肥、穗肥。\n\n四、病虫害防治\n重点防治稻瘟病、纹枯病、稻飞虱。采用生物防治为主，化学农药为辅。',
+             'https://images.unsplash.com/photo-1536052954887-fd25a05b61e3?w=400'),
+            ('苹果树常见病害防治指南', 'pest', 'fruit',
+             '一、炭疽病\n多发生于高温多雨季节。症状：果实表面出现褐色圆形病斑，逐渐扩大凹陷。防治：发病初期喷施多菌灵800倍液，每7-10天一次。\n\n二、轮纹病\n主要危害枝干和果实。防治：冬季清园，刮除病斑，涂抹石硫合剂。\n\n三、早期落叶病\n导致树势衰弱，影响花芽分化。防治：加强肥水管理，增强树势；发病前喷施波尔多液预防。\n\n四、综合防治原则\n"预防为主，综合防治"。合理修剪保持通风透光，及时清除病残体。',
+             'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=400'),
+            ('有机蔬菜施肥管理方案', 'fertilizer', 'vegetable',
+             '一、基肥\n每亩施腐熟农家肥2000-3000kg，配合饼肥50-100kg，深翻入土。\n\n二、追肥原则\n"少量多次"，根据蔬菜种类和生长期调整。叶菜类以氮肥为主，果菜类增施磷钾肥。\n\n三、有机肥料选择\n- 饼肥：菜籽饼、豆饼含氮量高\n- 草木灰：含钾丰富，适合果菜类\n- 沼液沼渣：营养全面，含活性微生物\n\n四、禁止使用的肥料\n化学合成肥料、城市垃圾、未腐熟的人畜粪尿。',
+             'https://images.unsplash.com/photo-1574943320219-553eb213f72d?w=400'),
+            ('茶叶采摘与加工储存技术', 'harvest', 'tea',
+             '一、采摘标准\n绿茶：一芽一叶或一芽二叶初展。红茶：一芽二叶或一芽三叶。乌龙茶：对夹叶（小开面至中开面）。\n\n二、绿茶加工流程\n摊青→杀青→揉捻→干燥。杀青温度280-320℃，时间3-5分钟，至叶质柔软、散发清香。\n\n三、红茶加工流程\n萎凋→揉捻→发酵→干燥。发酵温度24-28℃，湿度95%以上，时间3-5小时。\n\n四、储存要点\n避光、密封、防潮、低温(0-5℃最佳)。绿茶保质期12-18个月，普洱茶可长期陈化。',
+             'https://images.unsplash.com/photo-1563822249366-3efb23b8e0c9?w=400'),
+            ('果蔬冷链运输保鲜方法', 'storage', 'general',
+             '一、预冷处理\n采收后尽快预冷：叶菜类1-2小时内预冷至4-8℃，果菜类预冷至8-12℃。\n\n二、包装要求\n使用透气保鲜膜或带孔塑料袋，避免密封导致厌氧呼吸。箱内加冰袋或蓄冷剂。\n\n三、运输温度控制\n- 叶菜类：0-4℃\n- 果菜类：7-10℃\n- 热带水果：10-13℃\n- 根茎类：4-8℃\n\n四、常见问题\n冷害：温度过低导致褐变。乙烯伤害：不同果蔬混装导致催熟。建议分类运输。',
+             'https://images.unsplash.com/photo-1574269909862-7e1d70bb8078?w=400'),
+        ]
+        for title, cat, crop, content, cover in guide_defs:
+            FarmingGuide.objects.get_or_create(
+                title=title,
+                defaults={'category': cat, 'crop_type': crop, 'content': content, 'cover_image': cover, 'is_published': True}
+            )
+        self.stdout.write(f'  {len(guide_defs)} 篇农技指南')
+
+        # === 培训课程 ===
+        training_defs = [
+            ('有机农业认证流程与标准',
+             '有机农业认证是农产品进入高端市场的通行证。本课程详细讲解中国有机产品认证的全流程：'
+             '1. 申请阶段——选择认证机构、提交申请材料（土地承包合同、生产基地图、管理体系文件等）；'
+             '2. 文件审核——认证机构审核申请材料，确认生产基地符合有机标准；'
+             '3. 现场检查——检查员实地考察土壤、水源、投入品使用情况，采样检测农药残留和重金属；'
+             '4. 认证决定——认证委员会根据检查报告决定是否颁证，认证周期一般3-6个月；'
+             '5. 获证后管理——每年进行监督审核，证书有效期1年，到期需重新申请。'
+             '注意事项：转换期内（一般2-3年）产品不得使用有机标识，但可标注"有机转换期产品"。',
+             'https://www.ccof.net.cn/'),
+            ('智能温室大棚建设与管理',
+             '智能温室通过环境控制系统实现温、光、水、气、肥的精准管理，可显著提高产量和品质。'
+             '主要内容：1. 温室选址与结构设计——南北向采光好，跨度8-12米适宜，肩高≥3米；'
+             '2. 覆盖材料选择——PO膜透光率高寿命长，PC板保温性佳，玻璃透光率最高但造价贵；'
+             '3. 环境控制系统——温度控制（风机+湿帘夏季降温，热水管道冬季加温）、湿度控制（自动喷雾+通风）、光照控制（遮阳网+补光灯）；'
+             '4. 水肥一体化——滴灌系统精准供水供肥，EC/pH传感器实时监测，比传统灌溉节水50%、节肥30%；'
+             '5. 物联网平台——手机APP远程监控，异常报警（温度过高/过低、设备故障），数据自动记录生成报表。'
+             '投资回报：标准温室约200-300元/㎡，配合高附加值作物（樱桃番茄、草莓等）2-3年可收回成本。',
+             'https://www.agri-iot.cn/'),
+            ('农产品电商运营实战指南',
+             '本课程面向想拓展线上销路的农户，系统讲解电商运营的核心技能：'
+             '1. 平台选择——拼多多（农产品流量大，适合走量）、抖音电商（短视频+直播带货，转化率高）、社区团购（美团优选/多多买菜，直达社区）；'
+             '2. 店铺装修——产品主图6张（正面/背面/细节/场景/包装/对比），标题公式=品牌+品种+规格+卖点；'
+             '3. 定价策略——成本加成法（收购价+包装+快递+平台扣点+利润），竞品分析法（同品类top10均价），活动促销（限时折扣/满减/拼团）；'
+             '4. 物流包装——生鲜冷链（泡沫箱+冰袋+保温袋），干货防潮（铝箔袋+干燥剂），易碎品气柱袋；'
+             '5. 客服与售后——响应时间≤3分钟，坏果包赔（拍照退款），主动跟进物流状态，好评返现引导复购。'
+             '数据参考：农产品电商平均客单价60-120元，退货率3-8%（远低于服装类），复购率30-50%是核心盈利来源。',
+             'https://www.alibaba.com/'),
+            ('农产品品牌打造与市场营销',
+             '品牌是农产品溢价的核心竞争力。本课程涵盖从0到1建立农产品品牌的完整方法论：'
+             '1. 品牌定位——找准差异化卖点：地理标志（赣南脐橙）、品种独特（阳光玫瑰葡萄）、种植方式（古法耕种/零农药）、文化故事（祖传手艺/红色老区）；'
+             '2. 品牌命名——地域+品类+特色（如"北大仓·稻花香"），易记易传播，注册35类（广告销售）和31类（农产品）商标；'
+             '3. 包装设计——突出品牌色（绿色=生态，金色=品质，红色=喜庆），二维码溯源信息，小规格尝鲜装+大规格家庭装组合；'
+             '4. 渠道策略——线下：商超专柜/社区店/农夫市集，线上：电商平台/短视频/社区团购，B端：餐饮连锁/企业团购/礼品定制；'
+             '5. 品牌传播——抖音短视频展示种植过程（真实感=信任），微信社群维护老客户（复购+转介绍），参加农产品展销会（政府组织/行业协会）。'
+             '案例：褚橙从云南哀牢山到全国知名品牌，核心是"品质+人物故事+全渠道营销"三位一体。',
+             ''),
+            ('绿色防控技术与病虫害综合治理',
+             '绿色防控是减少化学农药使用、保障农产品安全的关键技术体系。课程内容：'
+             '1. 农业防治——选用抗病虫品种（如抗稻瘟病水稻品种）、合理轮作（豆科-禾本科轮作减少土传病害）、清洁田园（清除病残体降低病虫基数）；'
+             '2. 物理防治——杀虫灯（每20-30亩1盏，诱杀鳞翅目成虫）、色板诱杀（黄板诱蚜虫、蓝板诱蓟马，每亩20-30片）、防虫网（40-60目，阻隔害虫进入）；'
+             '3. 生物防治——天敌释放（赤眼蜂防治玉米螟、捕食螨防治红蜘蛛）、微生物制剂（Bt制剂防治菜青虫、白僵菌防治地下害虫）、植物源农药（苦参碱、印楝素）；'
+             '4. 化学防治（最后手段）——选用高效低毒低残留农药，严格按安全间隔期施药，交替用药防抗药性；'
+             '5. 预测预报——利用性诱剂监测成虫发生高峰期，结合气象数据预测病害流行趋势，精准把握防治适期。'
+             '目标：通过综合应用上述技术，实现化学农药使用量减少50%以上，农产品农药残留合格率100%。',
+             'https://www.agri.cn/'),
+        ]
+        for title, content, resource_url in training_defs:
+            Training.objects.get_or_create(
+                title=title,
+                defaults={'content': content, 'resource_url': resource_url}
+            )
+        self.stdout.write(f'  {len(training_defs)} 个培训课程')
+
+        # === 供需对接帖子 ===
+        if farmers:
+            SupplyDemandPost.objects.get_or_create(
+                product_name='云南咖啡豆', post_type='supply',
+                defaults={'author': farmers[0].user, 'category': '干货', 'quantity': 500, 'unit': 'kg',
+                    'price_range': '40-60元/kg', 'region': '云南省普洱市',
+                    'description': '2026年6月采收，阿拉比卡品种，海拔1200米种植，日晒处理，风味醇厚。'}
+            )
+            SupplyDemandPost.objects.get_or_create(
+                product_name='五常有机大米', post_type='supply',
+                defaults={'author': farmers[7].user, 'category': '粮油', 'quantity': 3000, 'unit': 'kg',
+                    'price_range': '12-18元/kg', 'region': '黑龙江省五常市',
+                    'description': '2025年秋季新米，有机认证，稻花香2号品种，颗粒饱满，口感香甜。'}
+            )
+            SupplyDemandPost.objects.get_or_create(
+                product_name='新鲜时蔬（每周供应）', post_type='demand',
+                defaults={'author': farmers[2].user, 'category': '蔬菜', 'quantity': 200, 'unit': 'kg',
+                    'price_range': '3-8元/kg', 'region': '北京市朝阳区',
+                    'description': '社区团购每周需要200kg时令蔬菜，要求无农药残留，可长期合作。'}
+            )
+            SupplyDemandPost.objects.get_or_create(
+                product_name='赣南脐橙', post_type='supply',
+                defaults={'author': farmers[15].user, 'category': '水果', 'quantity': 2000, 'unit': 'kg',
+                    'price_range': '8-12元/kg', 'region': '江西省赣州市',
+                    'description': '赣南脐橙，国家地理标志产品，11月成熟，甜度高、汁多化渣。'}
+            )
+            SupplyDemandPost.objects.get_or_create(
+                product_name='优质茶叶（长期需求）', post_type='demand',
+                defaults={'author': farmers[12].user, 'category': '茶叶', 'quantity': 100, 'unit': 'kg',
+                    'price_range': '100-300元/kg', 'region': '浙江省杭州市',
+                    'description': '茶庄长期寻找龙井/白茶供应商，要求有质检报告，品质稳定。'}
+            )
+            self.stdout.write(f'  5 条供需对接帖子')
+
+        # === 预售活动 ===
+        if farmers:
+            PreOrderCampaign.objects.get_or_create(
+                product_name='阳光玫瑰葡萄',
+                defaults={'farmer': farmers[0], 'description': '云南高原阳光玫瑰，甜度20+，果粒饱满，8月中旬成熟。现开启预售，成熟即发。',
+                    'target_quantity': 500, 'current_quantity': 168, 'unit_price': 30.00, 'discount_price': 22.00, 'unit': 'kg',
+                    'start_date': now, 'end_date': now + timedelta(days=60), 'harvest_date': (now + timedelta(days=50)).date(),
+                    'status': 'active'}
+            )
+            PreOrderCampaign.objects.get_or_create(
+                product_name='正宗五常大米（新米预售）',
+                defaults={'farmer': farmers[7], 'description': '2026年新米预售，稻花香2号，有机种植，预计10月收割、11月发货。这是真正的五常核心产区大米。',
+                    'target_quantity': 2000, 'current_quantity': 520, 'unit_price': 18.00, 'discount_price': 13.80, 'unit': 'kg',
+                    'start_date': now, 'end_date': now + timedelta(days=120), 'harvest_date': (now + timedelta(days=110)).date(),
+                    'status': 'active'}
+            )
+            self.stdout.write(f'  2 个预售活动')
+
         self.stdout.write(self.style.SUCCESS('\n=== 填充完成 ==='))
-        self.stdout.write('  账号密码未改变')
-        self.stdout.write(f'  覆盖 {len(coops)} 省合作社 / {len(farmers)} 农户 / {len(products)} 产品 / {total_batches} 批次')
+        self.stdout.write(f'  账号: {len(consumers)}个消费者 + {len(farmers)}个农户 + 1个管理员(demo_admin)')
+        self.stdout.write(f'  密码: 消费者/农户 → demo123 | 管理员 → DemoPass#2026')
+        self.stdout.write(f'  管理员后台可查看:')
+        self.stdout.write(f'    - {len(pending_products)} 个待审核产品（产品审核）')
+        self.stdout.write(f'    - {pending_batch_count} 个待审核批次（批次审核/溯源编码审批）')
+        self.stdout.write(f'    - {cart_count} 件购物车商品')
+        self.stdout.write(f'    - {fav_count} 条收藏记录')
+        self.stdout.write(f'    - {len(all_orders)} 个订单 + {cnt} 条评价')
+        self.stdout.write(f'  覆盖 34 省 / {len(farmers)} 农户 / {len(products)} 产品 / {total_batches} 批次')
+        self.stdout.write(f'  新增: 5篇农技指南 + 5条供需帖子 + 2个预售活动 + {len(training_defs)}个培训课程')

@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .admin-layout .admin-sidebar-col {
+    position: sticky;
+    top: 5rem;
+    align-self: flex-start;
+  }
+  .admin-sidebar { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .admin-sidebar .admin-sidebar-title { font-weight: 700; margin-bottom: 1rem; }
+  .admin-sidebar .nav-link {
+    border-radius: 8px; padding: 10px 14px; color: #555;
+    font-weight: 500; transition: all 0.2s; margin-bottom: 2px;
+  }
+  .admin-sidebar .nav-link:hover { background: var(--primary-light); color: var(--primary); }
+  .admin-sidebar .nav-link.admin-active {
+    background: #2d8a4e; color: #fff !important; font-weight: 600;
+  }
+  .admin-sidebar .nav-link.admin-active:hover { background: #1e6b37; color: #fff !important; }
+  /* Admin stat cards */
+  .admin-stat-row .stat-card {
+    border-radius: 12px; padding: 24px 20px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    text-align: center; background: #fff;
+    border-top: 4px solid #2d8a4e;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .admin-stat-row .stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  }
+  .admin-stat-row .stat-number {
+    font-size: 2.2rem; font-weight: 800; line-height: 1.2;
+  }
+  .admin-stat-row .stat-label {
+    color: #6b7280; font-size: 0.9rem; margin-top: 4px;
+  }
+  .admin-stat-row .stat-icon {
+    font-size: 1.4rem; margin-bottom: 6px;
+  }
+</style>
+<div class="container-fluid py-4 admin-layout">
+  <div class="row">
+    <div class="col-md-2 mb-3 admin-sidebar-col">
+      <div class="admin-sidebar">
+        <h6 class="admin-sidebar-title"><i class="bi bi-shield-lock text-danger"></i> 管理后台</h6>
+        <nav class="nav flex-column">
+          <a class="nav-link {% if request.resolver_match.url_name == 'admin_dashboard' %}admin-active{% endif %}" href="{% url 'admin_panel:dashboard'  %}"><i class="bi bi-speedometer2"></i> 概览</a>
+          <a class="nav-link {% if request.resolver_match.url_name == 'admin_products' %}admin-active{% endif %}" href="{% url 'admin_panel:products'  %}"><i class="bi bi-basket"></i> 产品审核</a>
+          <a class="nav-link {% if request.resolver_match.url_name == 'admin_batches' %}admin-active{% endif %}" href="{% url 'admin_panel:batches'  %}"><i class="bi bi-box-seam"></i> 批次审核</a>
+          <a class="nav-link {% if request.resolver_match.url_name == 'admin_users' %}admin-active{% endif %}" href="{% url 'admin_panel:users'  %}"><i class="bi bi-people"></i> 用户管理</a>
+          <a class="nav-link {% if request.resolver_match.url_name == 'applications' %}admin-active{% endif %}" href="{% url 'admin_panel:applications'  %}"><i class="bi bi-person-plus"></i> 入驻审核</a>
+          <a class="nav-link" href="/admin/" target="_blank"><i class="bi bi-gear"></i> Django Admin</a>
+          <a class="nav-link" href="/admin/core/announcement/" target="_blank"><i class="bi bi-megaphone"></i> 通告管理</a>
+          <hr class="my-2">
+          <a class="nav-link" href="{% url 'admin_panel:export_orders'  %}"><i class="bi bi-download"></i> 导出订单</a>
+          <a class="nav-link" href="{% url 'admin_panel:export_products'  %}"><i class="bi bi-download"></i> 导出产品</a>
+        </nav>
+      </div>
+    </div>
+    <div class="col-md-10">
+      {% block body %}{% endblock %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,4 +1,4 @@
-﻿# 智溯农链 - 一键启动脚本
+﻿# 智农溯源 - 一键启动脚本
 Set-Location $PSScriptRoot
 $env:PYTHONIOENCODING = "utf-8"
 $ErrorActionPreference = "Continue"

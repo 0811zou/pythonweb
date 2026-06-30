@@ -1,0 +1,86 @@
+{% extends base_template %}
+{% block title %}发布供需 - 智农溯源{% endblock %}
+{% block body %}
+<div class="container py-4" style="max-width:640px;">
+  <h4 class="fw-bold mb-4"><i class="bi bi-arrow-left-right text-success"></i> {% if is_farmer %}发布供应{% else %}发布需求{% endif %}</h4>
+  <div class="card">
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label">类型</label>
+          <div class="d-flex gap-3">
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="post_type" value="supply" id="type_supply"
+                     {% if is_farmer %}checked{% endif %}>
+              <label class="form-check-label" for="type_supply"><i class="bi bi-box-arrow-up text-success"></i> 供应 <small class="text-muted">（农户）</small></label>
+            </div>
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="post_type" value="demand" id="type_demand"
+                     {% if not is_farmer %}checked{% endif %}>
+              <label class="form-check-label" for="type_demand"><i class="bi bi-box-arrow-down text-primary"></i> 需求 <small class="text-muted">（买家）</small></label>
+            </div>
+          </div>
+          <div class="form-text">
+            {% if is_farmer %}
+              <i class="bi bi-info-circle"></i> 作为农户，您可以发布供应信息，向买家展示您的产品。
+            {% else %}
+              <i class="bi bi-info-circle"></i> 作为买家，您可以发布需求信息，让农户了解您的采购意向。
+            {% endif %}
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">产品名称 <span class="text-danger">*</span></label>
+          <input type="text" name="product_name" class="form-control" placeholder="例如：云南咖啡豆、五常大米" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">产品分类</label>
+          <select name="category" class="form-select">
+            <option value="">请选择</option>
+            <option value="水果">水果</option>
+            <option value="蔬菜">蔬菜</option>
+            <option value="茶叶">茶叶</option>
+            <option value="粮油">粮油</option>
+            <option value="干货">干货</option>
+            <option value="畜禽">畜禽</option>
+            <option value="水产">水产</option>
+            <option value="中药材">中药材</option>
+            <option value="其他">其他</option>
+          </select>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <label class="form-label">数量 <span class="text-danger">*</span></label>
+            <input type="number" name="quantity" class="form-control" min="1" value="100" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label">单位</label>
+            <select name="unit" class="form-select">
+              <option value="kg">kg</option>
+              <option value="斤">斤</option>
+              <option value="吨">吨</option>
+              <option value="箱">箱</option>
+              <option value="袋">袋</option>
+              <option value="件">件</option>
+            </select>
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">价格区间</label>
+          <input type="text" name="price_range" class="form-control" placeholder="例如：40-60元/kg（选填）">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">所在地区 <span class="text-danger">*</span></label>
+          <input type="text" name="region" class="form-control" placeholder="省/市/区" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">详细描述</label>
+          <textarea name="description" class="form-control" rows="4" placeholder="描述你的产品特点、采收时间、品质标准等..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-success w-100"><i class="bi bi-send"></i> 发布</button>
+        <a href="{% url 'marketplace:list'  %}" class="btn btn-outline-secondary w-100 mt-2">取消</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

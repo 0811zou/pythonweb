@@ -1,0 +1,82 @@
+{% extends 'admin/panel_base.html' %}
+{% block title %}入驻审核 - 管理后台{% endblock %}
+{% block body %}
+<h4 class="fw-bold mb-1"><i class="bi bi-person-plus"></i> 入驻申请审核</h4>
+<p class="text-muted mb-3">审核农户的入驻申请</p>
+
+<div class="d-flex gap-2 mb-3">
+  <a href="?status=pending" class="btn btn-sm {% if status_filter == 'pending' %}btn-warning{% else %}btn-outline-warning{% endif %}">待审核</a>
+  <a href="?status=approved" class="btn btn-sm {% if status_filter == 'approved' %}btn-success{% else %}btn-outline-success{% endif %}">已通过</a>
+  <a href="?status=rejected" class="btn btn-sm {% if status_filter == 'rejected' %}btn-danger{% else %}btn-outline-danger{% endif %}">已拒绝</a>
+  <a href="?status=all" class="btn btn-sm {% if not status_filter or status_filter == 'all' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">全部</a>
+</div>
+
+{% if applications %}
+<div class="table-responsive">
+  <table class="table table-hover">
+    <thead>
+      <tr>
+        <th>类型</th>
+        <th>名称</th>
+        <th>电话</th>
+        <th>地区</th>
+        <th>简介</th>
+        <th>时间</th>
+        <th>状态</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for app in applications %}
+      <tr>
+        <td><span class="badge {% if app.apply_type == 'farmer' %}bg-primary{% else %}bg-info text-dark{% endif %}">{{ app.get_apply_type_display }}</span></td>
+        <td><strong>{{ app.name }}</strong></td>
+        <td>{{ app.phone }}</td>
+        <td>{{ app.region }}</td>
+        <td><small>{{ app.description|truncatechars:40 }}</small></td>
+        <td><small>{{ app.created_at|date:'m-d H:i' }}</small></td>
+        <td>
+          <span class="badge {% if app.status == 'pending' %}bg-warning text-dark{% elif app.status == 'approved' %}bg-success{% else %}bg-danger{% endif %}">
+            {{ app.get_status_display }}
+          </span>
+        </td>
+        <td>
+          {% if app.status == 'pending' %}
+          <button class="btn btn-sm btn-success" onclick="reviewApp({{ app.id }}, 'approve', '{{ app.name|escapejs }}')" title="通过"><i class="bi bi-check-lg"></i></button>
+          <button class="btn btn-sm btn-danger" onclick="reviewApp({{ app.id }}, 'reject', '{{ app.name|escapejs }}')" title="拒绝"><i class="bi bi-x-lg"></i></button>
+          {% elif app.reviewer_note %}
+          <small class="text-muted">{{ app.reviewer_note|truncatechars:20 }}</small>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-inbox" style="font-size:3rem;display:block;margin-bottom:12px;"></i>
+  <p>暂无申请</p>
+</div>
+{% endif %}
+
+{# ── 审核表单（隐藏）── #}
+<form id="reviewForm" method="POST" style="display:none;">
+  {% csrf_token %}
+  <input type="hidden" name="app_id" id="reviewAppId">
+  <input type="hidden" name="action" id="reviewAction">
+  <input type="hidden" name="reviewer_note" id="reviewNote">
+</form>
+
+<script>
+function reviewApp(id, action, name) {
+  const msg = action === 'approve' ? '确认通过「' + name + '」的申请？' : '确认拒绝「' + name + '」的申请？';
+  const note = prompt(msg + '\n可选：输入审核备注');
+  if (note === null) return;
+  document.getElementById('reviewAppId').value = id;
+  document.getElementById('reviewAction').value = action;
+  document.getElementById('reviewNote').value = note;
+  document.getElementById('reviewForm').submit();
+}
+</script>
+{% endblock %}

@@ -1,6 +1,6 @@
-{% extends 'base.html' %}
-{% block title %}我的收藏 - 智溯农链{% endblock %}
-{% block content %}
+{% extends base_template %}
+{% block title %}我的收藏 - 智农溯源{% endblock %}
+{% block body %}
 <div class="container py-4">
   <h4 class="fw-bold mb-4"><i class="bi bi-heart text-danger"></i> 我的收藏</h4>
 
@@ -25,9 +25,9 @@
           <span class="badge bg-success bg-opacity-10 text-success mb-2">{{ fav.product.category|default:'农产品' }}</span>
           <div class="d-flex justify-content-between align-items-center">
             <span class="fw-bold text-success">¥{{ fav.product.price }}<small>/{{ fav.product.unit }}</small></span>
-            <a href="{% url 'product_detail' fav.product.id %}" class="btn btn-sm btn-outline-success">详情</a>
+            <a href="{% url 'products:detail' fav.product.id %}" class="btn btn-sm btn-outline-success">详情</a>
           </div>
-          <form method="post" action="{% url 'favorite_toggle' fav.product.id %}" class="mt-2">
+          <form method="post" action="{% url 'trade:favorite_toggle' fav.product.id %}" class="mt-2">
             {% csrf_token %}
             <button type="submit" class="btn btn-sm btn-outline-danger w-100"><i class="bi bi-heartbreak"></i> 取消收藏</button>
           </form>
@@ -41,7 +41,7 @@
     <i class="bi bi-heart" style="font-size:4rem;display:block;margin-bottom:12px;"></i>
     <h5>还没有收藏</h5>
     <p class="small">浏览农产品时点击❤️即可收藏</p>
-    <a href="{% url 'product_list' %}" class="btn btn-success">去看看</a>
+    <a href="{% url 'products:list'  %}" class="btn btn-success">去看看</a>
   </div>
   {% endif %}
 </div>

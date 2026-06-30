@@ -1,0 +1,113 @@
+{% extends 'farmer/base.html' %}
+{% block title %}收款方式 - 智农溯源{% endblock %}
+{% block body %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0"><i class="bi bi-wallet2 text-success"></i> 收款方式管理</h4>
+    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addMethodModal">
+      <i class="bi bi-plus-lg"></i> 添加收款方式
+    </button>
+  </div>
+
+  {% if messages %}
+    {% for m in messages %}<div class="alert alert-{{ m.tags }} alert-dismissible fade show">{{ m }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endfor %}
+  {% endif %}
+
+  {% if payment_methods %}
+  <div class="row g-3">
+    {% for method in payment_methods %}
+    <div class="col-md-6">
+      <div class="card {% if not method.is_active %}opacity-50{% endif %}">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start mb-2">
+            <div>
+              {% if method.method_type == 'wechat' %}
+                <span class="badge bg-success"><i class="bi bi-wechat"></i> 微信支付</span>
+              {% elif method.method_type == 'alipay' %}
+                <span class="badge bg-primary"><i class="bi bi-credit-card"></i> 支付宝</span>
+              {% else %}
+                <span class="badge bg-secondary"><i class="bi bi-bank"></i> 银行卡转账</span>
+              {% endif %}
+              {% if method.is_active %}
+                <span class="badge bg-success bg-opacity-10 text-success">启用中</span>
+              {% else %}
+                <span class="badge bg-warning bg-opacity-10 text-warning">已停用</span>
+              {% endif %}
+            </div>
+            <div class="btn-group btn-group-sm">
+              <form method="post" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle">
+                <input type="hidden" name="method_id" value="{{ method.id }}">
+                <button type="submit" class="btn btn-outline-secondary btn-sm" title="{% if method.is_active %}停用{% else %}启用{% endif %}">
+                  <i class="bi bi-{% if method.is_active %}pause{% else %}play{% endif %}"></i>
+                </button>
+              </form>
+              <form method="post" class="d-inline" onsubmit="return confirm('确认删除该收款方式？')">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="method_id" value="{{ method.id }}">
+                <button type="submit" class="btn btn-outline-danger btn-sm" title="删除">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </div>
+          <div><strong>收款人：</strong>{{ method.account_name }}</div>
+          <div><strong>账号：</strong><code>{{ method.account_number }}</code></div>
+          <small class="text-muted">添加于 {{ method.created_at|date:'Y-m-d H:i' }}</small>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-wallet2" style="font-size:3rem;display:block;margin-bottom:12px;"></i>
+    <p>还没有添加收款方式，消费者下单后将无法看到您的收款信息</p>
+    <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addMethodModal">
+      <i class="bi bi-plus-lg"></i> 立即添加
+    </button>
+  </div>
+  {% endif %}
+</div>
+
+<!-- 添加收款方式弹窗 -->
+<div class="modal fade" id="addMethodModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-plus-circle"></i> 添加收款方式</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">收款方式</label>
+            <select name="method_type" class="form-select" required>
+              <option value="wechat">微信支付</option>
+              <option value="alipay">支付宝</option>
+              <option value="bank">银行卡转账</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">收款人/户名 <span class="text-danger">*</span></label>
+            <input type="text" name="account_name" class="form-control" required placeholder="例如：张三">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">账号 <span class="text-danger">*</span></label>
+            <input type="text" name="account_number" class="form-control" required
+                   placeholder="微信号/支付宝账号/银行卡号">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+          <button type="submit" class="btn btn-success">确认添加</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

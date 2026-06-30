@@ -1,0 +1,69 @@
+{% extends base_template %}
+{% block title %}预售认养 - 智农溯源{% endblock %}
+{% block body %}
+<div class="container py-4">
+  <div class="text-center mb-4">
+    <span style="font-size:2.5rem;">📦</span>
+    <h2 class="section-title mt-2">预售认养</h2>
+    <p class="section-subtitle">提前预订，收获时发货。农户提前锁定收入，消费者享受优惠价格</p>
+  </div>
+
+  <div class="d-flex justify-content-center gap-2 mb-4">
+    {% if user.is_authenticated and user.farmerprofile %}
+    <a href="{% url 'preorder:create'  %}" class="btn btn-success"><i class="bi bi-plus-lg"></i> 创建预售活动</a>
+    {% elif not user.is_authenticated %}
+    <a href="{% url 'accounts:login'  %}?next={% url 'preorder:create'  %}" class="btn btn-outline-success"><i class="bi bi-box-arrow-in-right"></i> 登录后创建预售</a>
+    <div class="small text-muted mt-1">还没有账号？<a href="{% url 'accounts:register'  %}">立即注册农户账号</a></div>
+    {% endif %}
+  </div>
+
+  {% if campaigns %}
+  <div class="row g-3">
+    {% for c in campaigns %}
+    <div class="col-md-6 col-lg-4">
+      <a href="{% url 'preorder:detail' c.id %}" class="text-decoration-none">
+        <div class="card h-100 shadow-sm hover-shadow">
+          {% if c.cover_image %}
+          <img src="{{ c.cover_image }}" class="card-img-top" style="height:160px;object-fit:cover;" alt="">
+          {% else %}
+          <div class="card-img-top bg-success bg-opacity-10 d-flex align-items-center justify-content-center" style="height:160px;">
+            <i class="bi bi-calendar-check" style="font-size:3rem;color:#2d8a4e;"></i>
+          </div>
+          {% endif %}
+          <div class="card-body">
+            <h5 class="card-title text-dark">{{ c.product_name }}</h5>
+            <p class="small text-muted mb-2">{{ c.farmer.user.username }} · {{ c.harvest_date|default:'采收日期待定' }}</p>
+            <!-- 价格对比 -->
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="fw-bold fs-5 text-success">¥{{ c.discount_price }}</span>
+              <span class="text-muted text-decoration-line-through small">¥{{ c.unit_price }}</span>
+              <span class="badge bg-danger">{{ c.discount_price|floatformat:0 }}折</span>
+            </div>
+            <!-- 进度条 -->
+            <div class="progress mb-1" style="height:8px;">
+              <div class="progress-bar bg-success" style="width:{{ c.progress }}%;"></div>
+            </div>
+            <div class="d-flex justify-content-between">
+              <small class="text-muted">已预订 {{ c.current_quantity }}/{{ c.target_quantity }} {{ c.unit }}</small>
+              <small class="text-danger">仅剩 {{ c.remaining }}{{ c.unit }}</small>
+            </div>
+          </div>
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-5 text-muted">
+    <i class="bi bi-inbox" style="font-size:3rem;display:block;margin-bottom:8px;"></i>
+    <p>暂无预售活动</p>
+    {% if user.is_authenticated and user.farmerprofile %}
+    <a href="{% url 'preorder:create'  %}" class="btn btn-success">创建预售活动</a>
+    {% elif not user.is_authenticated %}
+    <a href="{% url 'accounts:login'  %}?next={% url 'preorder:create'  %}" class="btn btn-outline-success"><i class="bi bi-box-arrow-in-right"></i> 登录后创建预售</a>
+    <div class="small text-muted mt-1">还没有账号？<a href="{% url 'accounts:register'  %}">立即注册农户账号</a></div>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,6 +1,6 @@
-{% extends 'base.html' %}
-{% block title %}购物车 - 智溯农链{% endblock %}
-{% block content %}
+{% extends base_template %}
+{% block title %}购物车 - 智农溯源{% endblock %}
+{% block body %}
 <div class="container py-4" style="max-width:800px;">
   <h4 class="fw-bold mb-4"><i class="bi bi-cart text-success"></i> 购物车</h4>
 
@@ -9,7 +9,7 @@
   {% endif %}
 
   {% if items %}
-  <form method="post" action="{% url 'cart_batch_checkout' %}" id="checkoutForm">
+  <form method="post" action="{% url 'trade:cart_batch_checkout'  %}" id="checkoutForm">
     {% csrf_token %}
     <div class="card">
       <div class="card-body p-0">
@@ -27,12 +27,12 @@
           </div>
           {% endif %}
           <div class="flex-grow-1">
-            <a href="{% url 'product_detail' item.product.id %}" class="text-decoration-none"><strong>{{ item.product.name }}</strong></a>
+            <a href="{% url 'products:detail' item.product.id %}" class="text-decoration-none"><strong>{{ item.product.name }}</strong></a>
             <div class="text-muted small">¥{{ item.product.price }}/{{ item.product.unit }}</div>
           </div>
           <div class="text-end me-3" style="min-width:80px;">
             <div class="d-flex align-items-center">
-              <form method="post" action="{% url 'cart_remove' item.product.id %}" class="d-inline">
+              <form method="post" action="{% url 'trade:cart_remove' item.product.id %}" class="d-inline">
                 {% csrf_token %}
                 <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-dash"></i></button>
               </form>
@@ -55,8 +55,9 @@
             </span>
           </div>
           <div>
-            <a href="{% url 'cart_checkout' %}" class="btn btn-outline-success btn-sm me-2">结算全部</a>
-            <button type="submit" class="btn btn-success btn-sm" id="batchCheckoutBtn" disabled>
+            <a href="{% url 'trade:cart_checkout'  %}" class="btn btn-outline-success btn-sm me-2">结算全部</a>
+            <button type="button" class="btn btn-success btn-sm" id="batchCheckoutBtn" disabled
+                    onclick="goCheckout()">
               <i class="bi bi-credit-card"></i> 结算选中
             </button>
           </div>
@@ -82,13 +83,21 @@
       document.getElementById('selectedTotal').textContent = '¥' + total.toFixed(2);
       document.getElementById('batchCheckoutBtn').disabled = checked.length === 0;
     }
+    function goCheckout() {
+      const checked = document.querySelectorAll('.item-checkbox:checked');
+      const ids = Array.from(checked).map(cb => cb.value);
+      if (ids.length === 0) return;
+      const params = new URLSearchParams();
+      ids.forEach(id => params.append('item_ids', id));
+      window.location.href = "{% url 'trade:cart_checkout' %}?" + params.toString();
+    }
   </script>
   {% else %}
   <div class="text-center py-5 text-muted">
     <i class="bi bi-cart" style="font-size:4rem;display:block;margin-bottom:12px;"></i>
     <h5>购物车是空的</h5>
     <p class="small">快去逛逛，把喜欢的农产品加入购物车吧</p>
-    <a href="{% url 'product_list' %}" class="btn btn-success">去逛逛</a>
+    <a href="{% url 'products:list'  %}" class="btn btn-success">去逛逛</a>
   </div>
   {% endif %}
 </div>

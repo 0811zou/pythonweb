@@ -1,0 +1,54 @@
+{% extends base_template %}
+{% block title %}申请入驻 - 智农溯源{% endblock %}
+{% block body %}
+<section class="py-5">
+  <div class="container" style="max-width:600px;">
+    <div class="text-center mb-4">
+      <span style="font-size:2.5rem;">🤝</span>
+      <h2 class="section-title mt-2">申请入驻平台</h2>
+      <p class="section-subtitle">农户可申请入驻，审核通过后即可上架产品、使用平台服务</p>
+    </div>
+
+    <div class="card">
+      <div class="card-body p-4">
+        <form method="POST">
+          {% csrf_token %}
+          <input type="hidden" name="apply_type" value="farmer">
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">姓名</label>
+            <input type="text" name="name" class="form-control" required
+                   placeholder="如：张三" value="{{ prefill.name|default:'' }}">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">联系电话</label>
+            <input type="tel" name="phone" class="form-control" required
+                   placeholder="如：13800138000" value="{{ prefill.phone|default:'' }}">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">所在地区</label>
+            <input type="text" name="region" class="form-control" required
+                   placeholder="如：山东省寿光市" value="{{ prefill.region|default:'' }}">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold">简介（可选）</label>
+            <textarea name="description" class="form-control" rows="3"
+                      placeholder="介绍一下您的产品种类、种植规模或特色…">{{ prefill.description|default:'' }}</textarea>
+          </div>
+
+          <button type="submit" class="btn btn-success w-100 py-2">
+            <i class="bi bi-send"></i> 提交申请
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <div class="text-center mt-3 text-muted small">
+      <i class="bi bi-info-circle"></i> 提交后管理员会在 1-2 个工作日内审核，审核结果会通过站内通知发送。
+    </div>
+  </div>
+</section>
+{% endblock %}

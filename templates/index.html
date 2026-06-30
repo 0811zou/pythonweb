@@ -1,13 +1,13 @@
-{% extends 'base.html' %}
+{% extends base_template %}
 {% load static %}
 
-{% block title %}智溯农链 —— 农产品溯源与智能供需匹配平台{% endblock %}
+{% block title %}智农溯源 —— 农产品溯源与智能助农平台{% endblock %}
 
 {% block extra_head %}
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 {% endblock %}
 
-{% block content %}
+{% block body %}
 <!-- Hero -->
 <section class="hero">
   <div class="container position-relative">
@@ -15,25 +15,25 @@
       <div class="col-lg-7">
         <div class="mb-3">
           <span class="badge bg-success me-2"><i class="bi bi-shield-check"></i> 溯源认证</span>
-          <span class="badge bg-primary me-2"><i class="bi bi-graph-up"></i> 数据分析</span>
-          <span class="badge bg-warning text-dark me-2"><i class="bi bi-map"></i> 产地分布</span>
-          <span class="badge bg-info text-dark"><i class="bi bi-qr-code"></i> 扫码溯源</span>
+          <span class="badge bg-primary me-2"><i class="bi bi-arrow-left-right"></i> 供需对接</span>
+          <span class="badge bg-warning text-dark me-2"><i class="bi bi-calendar-heart"></i> 时令推荐</span>
+          <span class="badge bg-info text-dark"><i class="bi bi-book"></i> 农技知识</span>
         </div>
-        <h1>从田间到餐桌<br>从数据到决策</h1>
-        <p>智溯农链融合二维码溯源与数据分析技术，消费者扫码可追溯产品全链路信息，农户通过市场分析洞察需求趋势，实现农产品精准产销对接。</p>
+        <h1>从田间到餐桌<br>从生产到销售</h1>
+        <p>智农溯源是公益性助农平台，为农户提供供需对接、农技知识和预售认养服务，让消费者扫码溯源、应季而食，实现真正的助农惠农。</p>
         <div class="d-flex flex-wrap gap-3">
-          <a href="/products/" class="btn btn-primary btn-lg"><i class="bi bi-basket"></i> 浏览农产品</a>
-          <a href="/trace/" class="btn btn-outline-light btn-lg"><i class="bi bi-qr-code-scan"></i> 扫码溯源</a>
+          <a href="{% url 'products:list' %}" class="btn btn-primary btn-lg"><i class="bi bi-basket"></i> 浏览农产品</a>
+          <a href="{% url 'traceability:trace_query' %}" class="btn btn-outline-light btn-lg"><i class="bi bi-qr-code-scan"></i> 扫码溯源</a>
           {% if user.is_authenticated %}
             {% if user.is_staff %}
-              <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-light btn-lg"><i class="bi bi-shield-lock"></i> 管理后台</a>
+              <a href="{% url 'admin_panel:dashboard'  %}" class="btn btn-outline-light btn-lg"><i class="bi bi-shield-lock"></i> 管理后台</a>
             {% elif user.farmerprofile %}
-              <a href="{% url 'farmer_dashboard' %}" class="btn btn-success btn-lg"><i class="bi bi-person-circle"></i> 农户工作台</a>
+              <a href="{% url 'products:farmer_dashboard'  %}" class="btn btn-success btn-lg"><i class="bi bi-person-circle"></i> 农户工作台</a>
             {% else %}
-              <a href="{% url 'cart_view' %}" class="btn btn-success btn-lg"><i class="bi bi-cart"></i> 购物车</a>
+              <a href="{% url 'trade:cart_view'  %}" class="btn btn-success btn-lg"><i class="bi bi-cart"></i> 购物车</a>
             {% endif %}
           {% else %}
-            <a href="{% url 'login' %}" class="btn btn-outline-light btn-lg"><i class="bi bi-box-arrow-in-right"></i> 登录/注册</a>
+            <a href="{% url 'accounts:login'  %}" class="btn btn-outline-light btn-lg"><i class="bi bi-box-arrow-in-right"></i> 登录/注册</a>
           {% endif %}
         </div>
       </div>
@@ -64,23 +64,22 @@
 <section class="py-4" style="background: var(--white); border-bottom: 1px solid #f0f0f0;">
   <div class="container">
     <div class="row g-2" id="stats-row">
-      <div class="col-3"><div class="stat-item"><div class="number" id="stat-products">-</div><div class="label">农产品</div></div></div>
-      <div class="col-3"><div class="stat-item"><div class="number" id="stat-farmers">-</div><div class="label">入驻农户</div></div></div>
-      <div class="col-3"><div class="stat-item"><div class="number" id="stat-orders">-</div><div class="label">完成订单</div></div></div>
-      <div class="col-3"><div class="stat-item"><div class="number" id="stat-coops">-</div><div class="label">合作合作社</div></div></div>
+      <div class="col-6 col-md-4"><a href="{% url 'products:list' %}" class="text-decoration-none"><div class="stat-item"><div class="number" id="stat-products">-</div><div class="label">在售农产品</div></div></a></div>
+      <div class="col-6 col-md-4"><a href="{% url 'products:farmer_directory' %}" class="text-decoration-none"><div class="stat-item"><div class="number" id="stat-farmers">-</div><div class="label">入驻农户</div></div></a></div>
+      <div class="col-6 col-md-4"><div class="stat-item"><div class="number" id="stat-orders">-</div><div class="label">完成订单</div></div></div>
     </div>
   </div>
 </section>
 
-<!-- 畅销产品 -->
+<!-- 时令正当季 -->
 <section class="py-5">
   <div class="container">
     <div class="text-center mb-4">
-      <span style="font-size:2rem;">🏆</span>
-      <h2 class="section-title mt-2">畅销产品</h2>
-      <p class="section-subtitle">平台最受欢迎的农产品，品质有保障</p>
+      <span style="font-size:2rem;">🍃</span>
+      <h2 class="section-title mt-2">时令正当季</h2>
+      <p class="section-subtitle">应季而食，不时不食。当前季节最新鲜的农产品</p>
     </div>
-    <div class="row g-4" id="hot-products-grid">
+    <div class="row g-4" id="seasonal-products-grid">
       <div class="col-12 text-center py-4"><div class="spinner-border text-success" role="status"></div></div>
     </div>
   </div>
@@ -98,77 +97,119 @@
       <div class="col-12 text-center py-4"><div class="spinner-border text-success" role="status"></div></div>
     </div>
     <div class="text-center mt-4">
-      <a href="/products/" class="btn btn-outline-primary">查看全部 <i class="bi bi-arrow-right"></i></a>
+      <a href="{% url 'products:list' %}" class="btn btn-outline-primary">查看全部 <i class="bi bi-arrow-right"></i></a>
     </div>
   </div>
 </section>
 
-<!-- 猜你喜欢 -->
+<!-- 供需精选 — 服务端渲染 -->
 <section class="py-5" style="background: #f8fdf9;">
   <div class="container">
     <div class="text-center mb-4">
-      <span style="font-size:2rem;">🎯</span>
-      <h2 class="section-title mt-2">猜你喜欢</h2>
-      <p class="section-subtitle">
-        {% if user.is_authenticated %}
-          基于你的喜好为你推荐
-        {% else %}
-          <a href="{% url 'login' %}" class="text-decoration-none">登录后获取个性化推荐</a>
-        {% endif %}
-      </p>
+      <span style="font-size:2rem;">🤝</span>
+      <h2 class="section-title mt-2">供需精选</h2>
+      <p class="section-subtitle">农户供应与买家需求精准对接，让好产品找到好销路</p>
     </div>
-    <div class="row g-4" id="recommend-products-grid">
-      <div class="col-12 text-center py-4"><div class="spinner-border text-success" role="status"></div></div>
+    <div class="row g-4" id="marketplace-posts-grid">
+      {% if marketplace_posts %}
+        {% for post in marketplace_posts %}
+        <div class="col-lg-3 col-md-4 col-6">
+          <a href="{% url 'marketplace:detail' post.id %}" class="text-decoration-none">
+            <div class="card h-100">
+              <div class="card-body d-flex flex-column">
+                <span class="badge {% if post.post_type == 'supply' %}bg-success{% else %}bg-primary{% endif %} mb-2" style="align-self:flex-start;">
+                  {{ post.get_post_type_display }}
+                </span>
+                <h6 class="card-title text-dark">{{ post.product_name }}</h6>
+                <p class="small text-muted mb-1"><i class="bi bi-box"></i> {{ post.quantity }}{{ post.unit }}</p>
+                <p class="small text-muted mb-0"><i class="bi bi-geo-alt"></i> {{ post.region }}</p>
+              </div>
+            </div>
+          </a>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="col-12 text-center py-3 text-muted">暂无供需信息</div>
+      {% endif %}
+    </div>
+    <div class="text-center mt-4">
+      <a href="{% url 'marketplace:list' %}" class="btn btn-outline-primary">查看全部 <i class="bi bi-arrow-right"></i></a>
     </div>
   </div>
 </section>
 
-<!-- 帮扶助农 -->
-<section class="py-5" style="background: linear-gradient(135deg, #fff8e1, #fff3e0);">
+<!-- 农技速览 — 服务端渲染 -->
+<section class="py-5" style="background: linear-gradient(135deg, #e8f5e9, #f1f8e9);">
   <div class="container">
     <div class="text-center mb-4">
-      <span style="font-size:2rem;">🌱</span>
-      <h2 class="section-title mt-2">帮扶助农</h2>
-      <p class="section-subtitle">您的每一次购买，都是对辛勤农户的一份支持</p>
+      <span style="font-size:2rem;">📖</span>
+      <h2 class="section-title mt-2">农技速览</h2>
+      <p class="section-subtitle">最新农业技术知识，帮助农户种得更好、卖得更好</p>
     </div>
-    <div class="row g-4" id="help-products-grid">
-      <div class="col-12 text-center py-4"><div class="spinner-border text-success" role="status"></div></div>
+    <div class="row g-4" id="guides-grid">
+      {% if guides %}
+        {% for g in guides %}
+        <div class="col-lg-3 col-md-4 col-6">
+          <a href="{% url 'knowledge:detail' g.id %}" class="text-decoration-none">
+            <div class="card h-100">
+              {% if g.cover_image %}<img src="{{ g.cover_image }}" class="card-img-top" style="height:120px;object-fit:cover;" alt="">{% endif %}
+              <div class="card-body">
+                <span class="badge bg-success mb-2">{{ g.get_category_display }}</span>
+                <h6 class="card-title text-dark">{{ g.title }}</h6>
+              </div>
+            </div>
+          </a>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="col-12 text-center py-3 text-muted">暂无农技指南</div>
+      {% endif %}
+    </div>
+    <div class="text-center mt-4">
+      <a href="{% url 'knowledge:list' %}" class="btn btn-outline-success">查看更多 <i class="bi bi-arrow-right"></i></a>
     </div>
   </div>
 </section>
 
-<!-- 为什么选择 -->
+<!-- 五大核心优势 -->
 <section class="py-5" style="background: var(--white);">
   <div class="container">
-    <h2 class="section-title text-center">为什么选择智溯农链？</h2>
-    <p class="section-subtitle text-center">四大核心优势，保障每一份农产品的品质与信任</p>
+    <h2 class="section-title text-center">为什么选择智农溯源？</h2>
+    <p class="section-subtitle text-center">五大服务，全方位助力农产品产销对接</p>
     <div class="row g-4 mt-2">
-      <div class="col-md-3 col-6">
+      <div class="col-md-4 col-6">
         <div class="text-center">
           <div class="feature-icon mx-auto"><i class="bi bi-qr-code"></i></div>
           <h5>批次溯源</h5>
-          <p class="small text-muted">每批产品独立二维码，生产信息全记录</p>
+          <p class="small text-muted">每批产品独立二维码，生产信息全链路可查</p>
         </div>
       </div>
-      <div class="col-md-3 col-6">
+      <div class="col-md-4 col-6">
+        <div class="text-center">
+          <div class="feature-icon mx-auto"><i class="bi bi-arrow-left-right"></i></div>
+          <h5>供需对接</h5>
+          <p class="small text-muted">农户发布供应、买家发布需求，精准撮合</p>
+        </div>
+      </div>
+      <div class="col-md-4 col-6">
+        <div class="text-center">
+          <div class="feature-icon mx-auto"><i class="bi bi-book"></i></div>
+          <h5>农技知识</h5>
+          <p class="small text-muted">按作物分类的种植指南，病虫害防治方法</p>
+        </div>
+      </div>
+      <div class="col-md-4 col-6">
+        <div class="text-center">
+          <div class="feature-icon mx-auto"><i class="bi bi-calendar-check"></i></div>
+          <h5>预售认养</h5>
+          <p class="small text-muted">收获前预售，农户提前锁定收入，消费者享受优惠</p>
+        </div>
+      </div>
+      <div class="col-md-4 col-6">
         <div class="text-center">
           <div class="feature-icon mx-auto"><i class="bi bi-shield-check"></i></div>
           <h5>品质保障</h5>
-          <p class="small text-muted">质检报告公开透明，信息不可篡改</p>
-        </div>
-      </div>
-      <div class="col-md-3 col-6">
-        <div class="text-center">
-          <div class="feature-icon mx-auto"><i class="bi bi-people"></i></div>
-          <h5>助农惠农</h5>
-          <p class="small text-muted">减少中间环节，农民获得合理收益</p>
-        </div>
-      </div>
-      <div class="col-md-3 col-6">
-        <div class="text-center">
-          <div class="feature-icon mx-auto"><i class="bi bi-cpu"></i></div>
-          <h5>AI 需求分析</h5>
-          <p class="small text-muted">智能分析市场数据，为农户提供精准销售决策支持</p>
+          <p class="small text-muted">质检报告公开透明，平台零利润纯公益</p>
         </div>
       </div>
     </div>
@@ -184,35 +225,35 @@
         {% elif user.farmerprofile %}欢迎回来，{{ user.username }}！
         {% else %}{{ user.username }}，欢迎选购！
         {% endif %}
-      {% else %}加入智溯农链{% endif %}
+      {% else %}加入智农溯源{% endif %}
     </h2>
     <p class="section-subtitle">
       {% if user.is_authenticated %}
         {% if user.is_staff %}
           审核产品、管理批次、查看所有订单数据
         {% elif user.farmerprofile %}
-          查看你的产品和订单，或浏览市场分析
+          管理产品、查看订单、参与供需对接
         {% else %}
-          去溯源查询验证产品来源，或继续购物
+          溯源查询验证产品来源，或继续购物
         {% endif %}
       {% else %}
-        农户可洞察市场需求，消费者可追溯产品源头
+        农户可发布供应、学习农技，消费者可追溯产品源头
       {% endif %}
     </p>
     <div class="d-flex justify-content-center gap-3 flex-wrap">
       {% if user.is_authenticated %}
         {% if user.is_staff %}
-          <a href="{% url 'admin_dashboard' %}" class="btn btn-danger btn-lg"><i class="bi bi-shield-lock"></i> 管理后台</a>
+          <a href="{% url 'admin_panel:dashboard'  %}" class="btn btn-danger btn-lg"><i class="bi bi-shield-lock"></i> 管理后台</a>
         {% else %}
-          <a href="/products/" class="btn btn-primary btn-lg"><i class="bi bi-basket"></i> 去购物</a>
-          <a href="/trace/" class="btn btn-outline-primary btn-lg"><i class="bi bi-qr-code-scan"></i> 溯源查询</a>
+          <a href="{% url 'products:list' %}" class="btn btn-primary btn-lg"><i class="bi bi-basket"></i> 去购物</a>
+          <a href="{% url 'traceability:trace_query' %}" class="btn btn-outline-primary btn-lg"><i class="bi bi-qr-code-scan"></i> 溯源查询</a>
           {% if user.farmerprofile %}
-            <a href="{% url 'farmer_dashboard' %}" class="btn btn-success btn-lg"><i class="bi bi-person-circle"></i> 工作台</a>
+            <a href="{% url 'products:farmer_dashboard'  %}" class="btn btn-success btn-lg"><i class="bi bi-person-circle"></i> 工作台</a>
           {% endif %}
         {% endif %}
       {% else %}
-        <a href="{% url 'register' %}" class="btn btn-primary btn-lg"><i class="bi bi-person-plus"></i> 免费注册</a>
-        <a href="{% url 'login' %}" class="btn btn-outline-primary btn-lg"><i class="bi bi-box-arrow-in-right"></i> 立即登录</a>
+        <a href="{% url 'accounts:register'  %}" class="btn btn-primary btn-lg"><i class="bi bi-person-plus"></i> 免费注册</a>
+        <a href="{% url 'accounts:login'  %}" class="btn btn-outline-primary btn-lg"><i class="bi bi-box-arrow-in-right"></i> 立即登录</a>
       {% endif %}
     </div>
   </div>
@@ -233,23 +274,23 @@ const catColors = {
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, ch => ({
-    '&': '&amp;',
-    '<': '&lt;',
-    '>': '&gt;',
-    '"': '&quot;',
-    "'": '&#39;'
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[ch]));
 }
 
 function productCard(p, badge) {
   const icon = catIcon[p.category] || 'basket';
   const color = catColors[p.category] || '#2d8a4e';
+  const imgUrl = p.image || (p.images && p.images.length ? p.images[0] : '');
   return `
     <div class="col-lg-3 col-md-4 col-6">
       <div class="card h-100 position-relative">
-        ${badge ? `<span class="position-absolute top-0 start-0 badge bg-${badge.bg} m-2">${badge.text}</span>` : ''}
-        ${p.image ? `
-          <img src="${escapeHtml(p.image)}" class="card-img-top" style="height:160px;object-fit:cover;" alt="${escapeHtml(p.name)}">
+        ${badge ? '<span class="position-absolute top-0 start-0 badge bg-' + badge.bg + ' m-2">' + badge.text + '</span>' : ''}
+        ${imgUrl ? `
+          <img src="${escapeHtml(imgUrl)}" class="card-img-top" style="height:160px;object-fit:cover;" alt="${escapeHtml(p.name)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+          <div class="card-img-top d-flex align-items-center justify-content-center" style="height:160px;background:${color}15;font-size:2.8rem;color:${color};display:none;">
+            <i class="bi bi-${icon}"></i>
+          </div>
         ` : `
           <div class="card-img-top d-flex align-items-center justify-content-center" style="height:160px;background:${color}15;font-size:2.8rem;color:${color};">
             <i class="bi bi-${icon}"></i>
@@ -258,7 +299,7 @@ function productCard(p, badge) {
         <div class="card-body d-flex flex-column">
           <span class="badge-trace mb-1" style="align-self:flex-start;background:${color}20;color:${color};">${escapeHtml(p.category || '农产品')}</span>
           <h5 class="card-title">${escapeHtml(p.name)}</h5>
-          <p class="card-text small flex-grow-1" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em;">${escapeHtml(p.description ? p.description.substring(0,60) : '来自优质产地的健康农产品')}</p>
+          <p class="card-text small flex-grow-1" style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.6em;">${escapeHtml((p.description || '来自优质产地的健康农产品').substring(0, 60))}</p>
           <div class="d-flex justify-content-between align-items-center mt-auto">
             <span class="small text-muted"><i class="bi bi-geo-alt"></i> ${escapeHtml(p.variety || '原产地直供')}</span>
             <span class="price" style="color:${color};">¥${Number.parseFloat(p.price).toFixed(2)} <small>/ ${escapeHtml(p.unit||'kg')}</small></span>
@@ -274,7 +315,7 @@ fetch('/api/stats/dashboard/').then(r=>r.json()).then(d => {
   document.getElementById('stat-products').textContent = d.total_products;
   document.getElementById('stat-farmers').textContent = d.total_farmers;
   document.getElementById('stat-orders').textContent = d.total_orders;
-  document.getElementById('stat-coops').textContent = d.total_coops || '-';
+  
 }).catch(() => {
   document.querySelectorAll('.stat-item .number').forEach(el => el.textContent = '?');
 });
@@ -294,91 +335,49 @@ function getAllProducts() {
   return loadPage('/api/products/?page=1');
 }
 
-// 加载所有产品和市场分析数据
+// 加载时令正当季 + 新品上架（供需精选和农技速览由服务端渲染，JS不再覆盖）
 Promise.all([
   getAllProducts(),
-  fetch('/api/analysis/demand/').then(r => r.json()).catch(() => null),
-]).then(([products, demandData]) => {
+  fetch('/api/products/seasonal/').then(r => r.json()).catch(() => ({products:[]})),
+]).then(([products, seasonalData]) => {
   if (!products || !products.length) return;
 
-  // 建立 名称->产品 映射
-  const nameMap = {};
-  products.forEach(p => { nameMap[p.name] = p; });
-
-  // 畅销产品
-  if (demandData && demandData.regional_demand_top) {
-    const hotList = demandData.regional_demand_top.slice(0, 4);
-    const hotGrid = document.getElementById('hot-products-grid');
-    hotGrid.innerHTML = hotList.map(item => {
-      const p = nameMap[item.product];
-      if (!p) return '';
-      return productCard(p, { text: '热销', bg: 'danger' });
-    }).filter(Boolean).join('') || '<div class="col-12 text-center text-muted py-3">暂无数据</div>';
+  // 时令正当季
+  const seasonalGrid = document.getElementById('seasonal-products-grid');
+  if (seasonalData.products && seasonalData.products.length) {
+    seasonalGrid.innerHTML = seasonalData.products.slice(0, 4).map(p =>
+      productCard(p, { text: seasonalData.current_season || '当季', bg: 'success' })
+    ).join('');
   } else {
-    document.getElementById('hot-products-grid').innerHTML = products.slice(0, 4).map(p =>
-      productCard(p, { text: '热销', bg: 'danger' })
+    seasonalGrid.innerHTML = products.slice(0, 4).map(p =>
+      productCard(p, { text: '当季', bg: 'success' })
     ).join('');
   }
 
-  // 新品上架
+  // 新品上架 (前4个 = 最新)
   document.getElementById('new-products-grid').innerHTML = products.slice(0, 4).map(p =>
-    productCard(p, { text: '新品', bg: 'success' })
+    productCard(p, { text: '新品', bg: 'info text-dark' })
   ).join('');
 
-  // 助农专区
-  const helpGrid = document.getElementById('help-products-grid');
-  if (demandData && demandData.product_supply_demand) {
-    const helpCandidates = demandData.product_supply_demand
-      .filter(item => {
-        const p = nameMap[item.product];
-        return p && item.sold < item.available && item.gap > item.sold;
-      })
-      .sort((a, b) => b.gap - a.gap)
-      .slice(0, 4);
-
-    if (helpCandidates.length) {
-      helpGrid.innerHTML = helpCandidates.map(item => {
-        const p = nameMap[item.product];
-        if (!p) return '';
-        return productCard(p, { text: '助农', bg: 'warning text-dark' });
-      }).join('');
-    } else {
-      const shuffled = [...products].sort(() => Math.random() - 0.5);
-      helpGrid.innerHTML = shuffled.slice(0, 4).map(p =>
-        productCard(p, { text: '助农', bg: 'warning text-dark' })
-      ).join('');
-    }
-  } else {
-    const shuffled = [...products].sort(() => Math.random() - 0.5);
-    helpGrid.innerHTML = shuffled.slice(0, 4).map(p =>
-      productCard(p, { text: '助农', bg: 'warning text-dark' })
-    ).join('');
-  }
-
-  // 猜你喜欢
-  const shuffled = [...products].sort(() => Math.random() - 0.5);
-  const recommendGrid = document.getElementById('recommend-products-grid');
-  recommendGrid.innerHTML = shuffled.slice(0, 8).map(p =>
-    productCard(p, { text: '推荐', bg: 'info text-dark' })
-  ).join('');
-
-  // 统一所有卡片高度：遍历四大区域，取最高卡片强制统一
-  (function equalizeCards() {
-    var grids = ['hot-products-grid','new-products-grid','help-products-grid','recommend-products-grid'];
+  // 统一卡片高度（含服务端渲染的供需精选和农技速览卡片）
+  setTimeout(function equalizeCards() {
+    var grids = ['seasonal-products-grid','new-products-grid','marketplace-posts-grid','guides-grid'];
     var allCards = [];
     grids.forEach(function(id) {
       var el = document.getElementById(id);
-      if (el) allCards.push.apply(allCards, el.querySelectorAll('.card'));
+      if (el) {
+        var cards = el.querySelectorAll('.card');
+        for (var i = 0; i < cards.length; i++) allCards.push(cards[i]);
+      }
     });
     if (!allCards.length) return;
-    // 先重置，再取最大高度
     allCards.forEach(function(c) { c.style.minHeight = ''; });
     var maxH = 0;
     allCards.forEach(function(c) { if (c.offsetHeight > maxH) maxH = c.offsetHeight; });
     if (maxH > 0) allCards.forEach(function(c) { c.style.minHeight = maxH + 'px'; });
-  })();
+  }, 500);
 }).catch(() => {
-  ['hot-products-grid', 'new-products-grid', 'help-products-grid', 'recommend-products-grid'].forEach(id => {
+  ['seasonal-products-grid', 'new-products-grid'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = '<div class="col-12 text-center py-4 text-muted">加载失败</div>';
   });

@@ -54,14 +54,14 @@ a:hover { color: var(--primary-dark); }
 }
 .nav-link {
   font-weight: 500;
-  color: var(--text-dark) !important;
-  padding: 0.5rem 1rem !important;
+  color: var(--text-dark);
+  padding: 0.5rem 1rem;
   border-radius: var(--radius-sm);
   transition: all 0.2s;
 }
 .nav-link:hover, .nav-link.active {
   background: var(--primary-light);
-  color: var(--primary) !important;
+  color: var(--primary);
 }
 
 /* ===== Hero Section ===== */
@@ -339,4 +339,62 @@ a:hover { color: var(--primary-dark); }
   align-items: center;
   justify-content: center;
   padding: 3rem;
+}
+
+/* ===== Farmer Sidebar ===== */
+.farmer-sidebar {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  position: sticky;
+  top: 1rem;
+}
+.farmer-sidebar .sidebar-avatar {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: #e8f5e9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  color: #2d8a4e;
+  margin: 0 auto 8px;
+}
+.farmer-sidebar .nav-link {
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #555;
+  font-weight: 500;
+  transition: all 0.2s;
+  margin-bottom: 2px;
+}
+.farmer-sidebar .nav-link:hover {
+  background: #e8f5e9;
+  color: #2d8a4e;
+}
+.farmer-sidebar .nav-link.active {
+  background: #2d8a4e;
+  color: #fff !important;
+  font-weight: 600;
+}
+.farmer-sidebar .nav-link.active:hover {
+  background: #1e6b37;
+  color: #fff !important;
+}
+
+/* Farmer stat cards */
+.stat-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  text-align: center;
+  transition: transform 0.2s;
+}
+.stat-card:hover { transform: translateY(-3px); }
+.stat-number {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--primary);
 }

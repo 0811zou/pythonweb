@@ -1,240 +1,39 @@
-import hashlib
-import json
-import secrets
-from io import BytesIO
-
-from django.conf import settings
-from django.core.files.base import ContentFile
-from django.core.validators import MaxValueValidator, MinValueValidator
-from django.contrib.auth.models import User
 from django.db import models
-from django.utils import timezone
 
+# ── Compatibility re-exports (models moved to dedicated apps) ──
+# These allow existing imports to keep working during the transition.
+# Remove after all views/serializers/admin are updated to import from new apps.
+from accounts.models import FarmerProfile, SubsidyApplication, FarmerPaymentMethod
+from products.models import Product, ProductBatch, Review, generate_batch_code
+from traceability.models import TraceEvent
+from trade.models import Order, OrderItem, Cart, CartItem, Favorite, LogisticsEvent
+from marketplace.models import SupplyDemandPost
+from knowledge.models import FarmingGuide
+from preorder.models import PreOrderCampaign, PreOrder
+from notifications.models import Notification
 
-def generate_batch_code():
-    """生成可读批次编号：B-20260529-A3F2X7K9"""
-    date_part = timezone.now().strftime('%Y%m%d')
-    rand_part = secrets.token_hex(4).upper()
-    return f'B-{date_part}-{rand_part}'
+__all__ = [
+    'FarmerProfile', 'SubsidyApplication', 'FarmerPaymentMethod',
+    'Product', 'ProductBatch', 'Review', 'generate_batch_code',
+    'TraceEvent',
+    'Order', 'OrderItem', 'Cart', 'CartItem', 'Favorite', 'LogisticsEvent',
+    'SupplyDemandPost',
+    'FarmingGuide',
+    'PreOrderCampaign', 'PreOrder',
+    'Notification',
+    'Training', 'Announcement',
+]
 
-class Cooperative(models.Model):
-    name = models.CharField(max_length=200)
-    contact = models.CharField(max_length=100, blank=True, null=True)
-    region = models.CharField(max_length=200, blank=True, null=True)
-    verified = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.name
-
-class FarmerProfile(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    cooperative = models.ForeignKey(Cooperative, on_delete=models.SET_NULL, null=True, blank=True)
-    phone = models.CharField(max_length=32, blank=True)
-    address = models.CharField(max_length=300, blank=True)
-    location_lat = models.FloatField(null=True, blank=True)
-    location_lng = models.FloatField(null=True, blank=True)
-    verified = models.BooleanField(default=False)
-    shop_description = models.TextField(blank=True, verbose_name='店铺简介')
-    shop_avatar = models.ImageField(upload_to='shop_avatars/', blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"FarmerProfile({self.user.username})"
-
-class Product(models.Model):
-    STATUS_CHOICES = [
-        ('draft', '草稿'),
-        ('pending', '待审核'),
-        ('approved', '已上架'),
-        ('rejected', '未通过'),
-    ]
-    farmer = models.ForeignKey(FarmerProfile, on_delete=models.CASCADE, related_name='products')
-    name = models.CharField(max_length=200)
-    category = models.CharField(max_length=100, blank=True)
-    variety = models.CharField(max_length=100, blank=True)
-    description = models.TextField(blank=True)
-    price = models.DecimalField(max_digits=10, decimal_places=2)
-    unit = models.CharField(max_length=50, default='kg')
-    image = models.ImageField(upload_to='products/', blank=True, null=True, help_text='产品图片')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
-    review_note = models.TextField(blank=True, help_text='审核意见')
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.name
-
-class ProductBatch(models.Model):
-    BATCH_STATUS = [
-        ('draft', '草稿'),
-        ('pending', '待质检'),
-        ('approved', '已通过'),
-        ('rejected', '未通过'),
-    ]
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='batches')
-    batch_code = models.CharField(max_length=100, unique=True, default=generate_batch_code)
-    harvest_date = models.DateField(null=True, blank=True)
-    quantity = models.PositiveIntegerField(default=0)
-    images = models.JSONField(default=list, blank=True)
-    trace_info = models.JSONField(default=dict, blank=True)
-    qc_report = models.CharField(max_length=500, blank=True, verbose_name='质检报告')
-    qc_images = models.JSONField(default=list, blank=True, verbose_name='质检图片')
-    status = models.CharField(max_length=20, choices=BATCH_STATUS, default='draft', verbose_name='批次状态')
-    qr_code = models.ImageField(upload_to='qrcodes/', blank=True, null=True, help_text='溯源二维码')
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"{self.product.name} #{self.batch_code}"
-
-    @property
-    def trace_url(self):
-        base_url = getattr(settings, 'SITE_BASE_URL', '').rstrip('/')
-        path = f"/trace/{self.batch_code}/"
-        return f"{base_url}{path}" if base_url else path
-
-    def save(self, *args, **kwargs):
-        is_new = self._state.adding
-        super().save(*args, **kwargs)
-        if is_new:
-            self.ensure_qr_code()
-
-    def ensure_qr_code(self):
-        if self.qr_code:
-            return
-        import qrcode
-
-        img = qrcode.make(self.trace_url)
-        buffer = BytesIO()
-        img.save(buffer, format='PNG')
-        filename = f"{self.batch_code}.png"
-        self.qr_code.save(filename, ContentFile(buffer.getvalue()), save=False)
-        super().save(update_fields=['qr_code'])
-
-
-class TraceEvent(models.Model):
-    EVENT_TYPES = [
-        ('planting', '种植'),
-        ('fertilizing', '施肥'),
-        ('pesticide', '农药'),
-        ('harvest', '采收'),
-        ('qc', '质检'),
-        ('storage', '入库'),
-        ('shipping', '发货'),
-        ('other', '其他'),
-    ]
-    batch = models.ForeignKey(ProductBatch, on_delete=models.CASCADE, related_name='events')
-    event_type = models.CharField(max_length=30, choices=EVENT_TYPES, default='other')
-    title = models.CharField(max_length=120)
-    description = models.TextField(blank=True)
-    operator = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
-    occurred_at = models.DateTimeField(default=timezone.now)
-    location = models.CharField(max_length=200, blank=True)
-    previous_hash = models.CharField(max_length=64, blank=True)
-    data_hash = models.CharField(max_length=64, blank=True, db_index=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['occurred_at', 'created_at']
-
-    def __str__(self):
-        return f"{self.batch.batch_code} - {self.title}"
-
-    def save(self, *args, **kwargs):
-        if not self.previous_hash:
-            previous = (
-                TraceEvent.objects
-                .filter(batch=self.batch)
-                .exclude(pk=self.pk)
-                .order_by('-created_at', '-id')
-                .first()
-            )
-            self.previous_hash = previous.data_hash if previous else ''
-        self.data_hash = self.calculate_hash()
-        super().save(*args, **kwargs)
-
-    def calculate_hash(self):
-        payload = {
-            'batch_code': self.batch.batch_code,
-            'event_type': self.event_type,
-            'title': self.title,
-            'description': self.description,
-            'operator_id': self.operator_id,
-            'occurred_at': self.occurred_at.isoformat() if self.occurred_at else '',
-            'location': self.location,
-            'previous_hash': self.previous_hash,
-        }
-        raw = json.dumps(payload, ensure_ascii=False, sort_keys=True)
-        return hashlib.sha256(raw.encode('utf-8')).hexdigest()
-
-class Order(models.Model):
-    STATUS_CHOICES = [
-        ('pending','pending'),
-        ('paid_offline','paid_offline'),
-        ('confirmed','confirmed'),
-        ('shipped','shipped'),
-        ('delivered','delivered'),
-        ('cancelled','cancelled'),
-    ]
-    buyer = models.ForeignKey(User, on_delete=models.CASCADE, related_name='orders')
-    total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    address = models.CharField(max_length=300)
-    payment_proof = models.CharField(max_length=500, blank=True)
-    tracking_number = models.CharField(max_length=100, blank=True, verbose_name='快递单号')
-    shipped_at = models.DateTimeField(null=True, blank=True)
-    delivered_at = models.DateTimeField(null=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-class OrderItem(models.Model):
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
-    product_batch = models.ForeignKey(ProductBatch, on_delete=models.SET_NULL, null=True)
-    quantity = models.PositiveIntegerField(default=1)
-    price = models.DecimalField(max_digits=10, decimal_places=2)
-
-class Cart(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='cart')
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def total_price(self):
-        return sum(item.subtotal() for item in self.items.all())
-
-    def total_items(self):
-        return sum(item.quantity for item in self.items.all())
-
-class CartItem(models.Model):
-    cart = models.ForeignKey(Cart, on_delete=models.CASCADE, related_name='items')
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    quantity = models.PositiveIntegerField(default=1)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def subtotal(self):
-        return self.product.price * self.quantity
-
-class Favorite(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorites')
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        unique_together = ('user', 'product')
-
-class SubsidyApplication(models.Model):
-    STATUS = [('submitted','submitted'),('approved','approved'),('rejected','rejected')]
-    farmer = models.ForeignKey(FarmerProfile, on_delete=models.CASCADE, related_name='subsidies')
-    type = models.CharField(max_length=100)
-    amount_requested = models.DecimalField(max_digits=12, decimal_places=2)
-    documents = models.JSONField(default=list, blank=True)
-    status = models.CharField(max_length=20, choices=STATUS, default='submitted')
-    admin_notes = models.TextField(blank=True)
-    submitted_at = models.DateTimeField(auto_now_add=True)
-    decided_at = models.DateTimeField(null=True, blank=True)
 
 class Training(models.Model):
     title = models.CharField(max_length=200)
     content = models.TextField()
     resource_url = models.CharField(max_length=500, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'core_training'
+
 
 class Announcement(models.Model):
     title = models.CharField(max_length=200, verbose_name='标题')
@@ -243,47 +42,39 @@ class Announcement(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        db_table = 'core_announcement'
         ordering = ['-created_at']
 
     def __str__(self):
         return self.title
 
-class Review(models.Model):
-    order = models.ForeignKey(Order, on_delete=models.CASCADE)
-    buyer = models.ForeignKey(User, on_delete=models.CASCADE)
-    farmer = models.ForeignKey(FarmerProfile, on_delete=models.CASCADE)
-    product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True, blank=True)
-    rating = models.PositiveSmallIntegerField(default=5, validators=[MinValueValidator(1), MaxValueValidator(5)])
-    comment = models.TextField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
 
-
-class Notification(models.Model):
-    """站内消息通知"""
-    NOTIFICATION_TYPES = [
-        ('order', '订单通知'),
-        ('batch', '批次通知'),
-        ('product', '产品通知'),
-        ('system', '系统通知'),
+class JoinApplication(models.Model):
+    """平台入驻申请表"""
+    APPLY_TYPE_CHOICES = [
+        ('farmer', '农户入驻'),
     ]
-    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
-    notification_type = models.CharField(max_length=20, choices=NOTIFICATION_TYPES, default='system')
-    title = models.CharField(max_length=200)
-    message = models.TextField(blank=True)
-    link = models.CharField(max_length=500, blank=True, help_text='点击后跳转的链接')
-    is_read = models.BooleanField(default=False)
+    STATUS_CHOICES = [
+        ('pending', '待审核'),
+        ('approved', '已通过'),
+        ('rejected', '已拒绝'),
+    ]
+    apply_type = models.CharField(max_length=20, choices=APPLY_TYPE_CHOICES, verbose_name='申请类型')
+    name = models.CharField(max_length=200, verbose_name='姓名/合作社名称')
+    phone = models.CharField(max_length=20, verbose_name='联系电话')
+    region = models.CharField(max_length=200, verbose_name='所在地区')
+    description = models.TextField(blank=True, verbose_name='简介（产品/规模/特色）')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name='审核状态')
+    reviewer_note = models.TextField(blank=True, verbose_name='审核备注')
+    reviewed_by = models.ForeignKey(
+        'auth.User', null=True, blank=True, on_delete=models.SET_NULL, related_name='reviewed_applications'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        db_table = 'core_joinapplication'
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"[{self.notification_type}] {self.title} -> {self.recipient.username}"
-
-
-class LogisticsEvent(models.Model):
-    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='events')
-    status = models.CharField(max_length=100)
-    timestamp = models.DateTimeField(auto_now_add=True)
-    location = models.CharField(max_length=200, blank=True)
-    note = models.TextField(blank=True)
+        return f'{self.get_apply_type_display()} - {self.name} ({self.get_status_display()})'

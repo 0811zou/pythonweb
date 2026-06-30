@@ -1,0 +1,94 @@
+{% extends base_template %}
+{% block title %}{{ campaign.product_name }} - 预售详情 - 智农溯源{% endblock %}
+{% block body %}
+<div class="container py-4" style="max-width:720px;">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/">首页</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'preorder:list'  %}">预售认养</a></li>
+      <li class="breadcrumb-item active">{{ campaign.product_name }}</li>
+    </ol>
+  </nav>
+
+  <div class="card shadow-sm mb-4">
+    {% if campaign.cover_image %}
+    <img src="{{ campaign.cover_image }}" class="card-img-top" style="max-height:280px;object-fit:cover;" alt="">
+    {% endif %}
+    <div class="card-body">
+      <span class="badge bg-success mb-2">预售进行中</span>
+      <h3 class="fw-bold mb-1">{{ campaign.product_name }}</h3>
+      <p class="text-muted mb-3">农户：{{ campaign.farmer.user.username }}</p>
+
+      {% if campaign.description %}
+      <p style="line-height:1.8;">{{ campaign.description }}</p>
+      {% endif %}
+
+      <!-- 价格 -->
+      <div class="row g-3 mb-4">
+        <div class="col-6">
+          <div class="p-3 bg-success bg-opacity-10 rounded-3 text-center">
+            <small class="text-muted">预售价</small>
+            <div class="fw-bold fs-3 text-success">¥{{ campaign.discount_price }}<small class="fs-6">/{{ campaign.unit }}</small></div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="p-3 bg-light rounded-3 text-center">
+            <small class="text-muted">原价</small>
+            <div class="fw-bold fs-3 text-muted text-decoration-line-through">¥{{ campaign.unit_price }}<small class="fs-6">/{{ campaign.unit }}</small></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 进度 -->
+      <div class="mb-4">
+        <div class="d-flex justify-content-between mb-1">
+          <strong>已预订 {{ campaign.current_quantity }}/{{ campaign.target_quantity }} {{ campaign.unit }}</strong>
+          <span class="text-danger fw-bold">仅剩 {{ campaign.remaining }}{{ campaign.unit }}</span>
+        </div>
+        <div class="progress" style="height:12px;">
+          <div class="progress-bar bg-success" style="width:{{ campaign.progress }}%;">{{ campaign.progress }}%</div>
+        </div>
+      </div>
+
+      <div class="small text-muted mb-3">
+        <div><i class="bi bi-calendar"></i> 预售截止：{{ campaign.end_date|date:'Y-m-d' }}</div>
+        {% if campaign.harvest_date %}<div><i class="bi bi-box-seam"></i> 预计采收：{{ campaign.harvest_date }}</div>{% endif %}
+        <div><i class="bi bi-clock"></i> 发布于：{{ campaign.created_at|date:'Y-m-d' }}</div>
+      </div>
+
+      <!-- 下单表单 -->
+      {% if campaign.status == 'active' and user.is_authenticated %}
+        {% if already_ordered %}
+        <div class="alert alert-info"><i class="bi bi-check-circle"></i> 您已成功预订该产品</div>
+        {% elif not user.farmerprofile %}
+        <hr>
+        <h5><i class="bi bi-cart-plus text-success"></i> 立即预订</h5>
+        <form method="post">
+          {% csrf_token %}
+          <div class="row g-3 mb-3">
+            <div class="col-4">
+              <label class="form-label">数量</label>
+              <input type="number" name="quantity" class="form-control" value="1" min="1" max="{{ campaign.remaining }}">
+            </div>
+            <div class="col-8">
+              <label class="form-label">收货地址</label>
+              <input type="text" name="address" class="form-control" placeholder="省/市/区 详细地址" required>
+            </div>
+          </div>
+          <p class="fw-bold">合计：¥<span id="total-price">{{ campaign.discount_price }}</span></p>
+          <button type="submit" class="btn btn-success btn-lg"><i class="bi bi-cart-check"></i> 确认预订</button>
+        </form>
+        {% endif %}
+      {% elif not user.is_authenticated %}
+      <div class="text-center py-3">
+        <a href="{% url 'accounts:login'  %}?next={{ request.path }}" class="btn btn-success btn-lg"><i class="bi bi-box-arrow-in-right"></i> 登录后预订</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="text-center">
+    <a href="{% url 'preorder:list'  %}" class="btn btn-outline-success"><i class="bi bi-arrow-left"></i> 返回预售列表</a>
+  </div>
+</div>
+{% endblock %}

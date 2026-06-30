@@ -7,7 +7,9 @@ from django.test import override_settings
 from django.urls import reverse
 from django.contrib.auth.models import User
 from rest_framework import status
-from .models import Cooperative, FarmerProfile, Product, ProductBatch, Order, OrderItem
+from accounts.models import FarmerProfile
+from products.models import Product, ProductBatch
+from trade.models import Order, OrderItem
 
 TEST_MEDIA_ROOT = tempfile.mkdtemp(prefix='agro-test-media-')
 
@@ -17,10 +19,8 @@ class ModelTests(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user('testuser', 'test@test.com', 'testpass123')
-        self.coop = Cooperative.objects.create(name='测试合作社', region='测试区')
         self.farmer = FarmerProfile.objects.create(
             user=self.user,
-            cooperative=self.coop,
             phone='13800138000',
             address='测试地址'
         )
@@ -35,11 +35,6 @@ class ModelTests(TestCase):
             quantity=50
         )
 
-    def test_cooperative_creation(self):
-        """测试合作社创建"""
-        self.assertEqual(self.coop.name, '测试合作社')
-        self.assertEqual(str(self.coop), '测试合作社')
-
     def test_farmer_profile_creation(self):
         """测试农户档案创建"""
         self.assertEqual(self.farmer.phone, '13800138000')
@@ -52,9 +47,9 @@ class ModelTests(TestCase):
         self.assertEqual(str(self.product), '测试苹果')
 
     def test_batch_creation(self):
-        """测试批次创建"""
+        """测试批次创建（审核后才生成编码，创建时batch_code为空）"""
         self.assertEqual(self.batch.quantity, 50)
-        self.assertIsNotNone(self.batch.batch_code)
+        # batch_code is now deferred — only generated on admin approval
         self.assertIn('测试苹果', str(self.batch))
 
     def test_product_farmer_relationship(self):
@@ -95,13 +90,13 @@ class AuthTests(TestCase):
 
     def test_login_page_loads(self):
         """测试登录页面加载"""
-        response = self.client.get(reverse('login'))
+        response = self.client.get(reverse('accounts:login'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '登录')
 
     def test_login_success(self):
         """测试登录成功"""
-        response = self.client.post(reverse('login'), {
+        response = self.client.post(reverse('accounts:login'), {
             'username': 'authuser',
             'password': 'authpass123'
         })
@@ -110,7 +105,7 @@ class AuthTests(TestCase):
 
     def test_login_failure(self):
         """测试登录失败"""
-        response = self.client.post(reverse('login'), {
+        response = self.client.post(reverse('accounts:login'), {
             'username': 'authuser',
             'password': 'wrongpass'
         })
@@ -122,17 +117,17 @@ class AuthTests(TestCase):
     def test_logout(self):
         """测试退出登录"""
         self.client.login(username='authuser', password='authpass123')
-        response = self.client.get(reverse('logout'))
+        response = self.client.get(reverse('accounts:logout'))
         self.assertRedirects(response, '/')
 
     def test_register_page_loads(self):
         """测试注册页面加载"""
-        response = self.client.get(reverse('register'))
+        response = self.client.get(reverse('accounts:register'))
         self.assertEqual(response.status_code, 200)
 
     def test_register_success(self):
         """测试注册成功"""
-        response = self.client.post(reverse('register'), {
+        response = self.client.post(reverse('accounts:register'), {
             'username': 'newuser',
             'password1': 'ComplexPass123!',
             'password2': 'ComplexPass123!',
@@ -148,9 +143,8 @@ class PageViewTests(TestCase):
     def setUp(self):
         self.client = Client()
         self.user = User.objects.create_user('pageuser', 'page@test.com', 'pagepass123')
-        self.coop = Cooperative.objects.create(name='页面测试合作社', region='测试区')
         self.farmer = FarmerProfile.objects.create(
-            user=self.user, cooperative=self.coop,
+            user=self.user,
             phone='13900000000', address='测试地址'
         )
         self.product = Product.objects.create(
@@ -162,29 +156,33 @@ class PageViewTests(TestCase):
 
     def test_home_page(self):
         """测试首页"""
-        response = self.client.get(reverse('home'))
+        response = self.client.get(reverse('core:home'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Django + DRF')
+        self.assertContains(response, '智农溯源')
 
     def test_product_list_page(self):
         """测试产品列表页"""
-        response = self.client.get(reverse('product_list'))
+        response = self.client.get(reverse('products:list'))
         self.assertEqual(response.status_code, 200)
 
     def test_product_detail_page(self):
         """测试产品详情页"""
-        response = self.client.get(reverse('product_detail', args=[self.product.pk]))
+        response = self.client.get(reverse('products:detail', args=[self.product.pk]))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '页面测试苹果')
 
     def test_trace_query_page(self):
         """测试溯源查询页"""
-        response = self.client.get(reverse('trace_query'))
+        response = self.client.get(reverse('traceability:trace_query'))
         self.assertEqual(response.status_code, 200)
 
     def test_trace_page(self):
         """测试溯源结果页"""
-        response = self.client.get(reverse('trace', args=[self.batch.batch_code]))
+        # batch_code is deferred — generate one for test
+        from products.models import generate_batch_code
+        self.batch.batch_code = generate_batch_code()
+        self.batch.save(update_fields=['batch_code'])
+        response = self.client.get(reverse('traceability:trace', args=[self.batch.batch_code]))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, str(self.batch.batch_code)[:8])
 
@@ -197,9 +195,8 @@ class APITests(TestCase):
         self.client = Client()
         self.user = User.objects.create_user('apiuser', 'api@test.com', 'apipass123')
         self.buyer = User.objects.create_user('buyeruser', 'buyer@test.com', 'buyerpass123')
-        self.coop = Cooperative.objects.create(name='API测试合作社', region='测试区')
         self.farmer = FarmerProfile.objects.create(
-            user=self.user, cooperative=self.coop,
+            user=self.user,
             phone='13700000000', address='API测试地址'
         )
         self.product = Product.objects.create(

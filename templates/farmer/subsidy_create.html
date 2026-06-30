@@ -1,0 +1,40 @@
+{% extends base_template %}
+{% block title %}提交补贴申请 - 智农溯源{% endblock %}
+{% block body %}
+<div class="container py-4" style="max-width:600px;">
+  <h4 class="fw-bold mb-4"><i class="bi bi-cash-coin text-warning"></i> 提交补贴申请</h4>
+
+  <form method="POST" class="card p-4">
+    {% csrf_token %}
+    <div class="mb-3">
+      <label class="form-label fw-bold">补贴类型</label>
+      <select name="type" class="form-select" required>
+        <option value="">请选择补贴类型</option>
+        <option value="种植补贴" {% if prefill.type == '种植补贴' %}selected{% endif %}>种植补贴</option>
+        <option value="农机补贴" {% if prefill.type == '农机补贴' %}selected{% endif %}>农机补贴</option>
+        <option value="良种补贴" {% if prefill.type == '良种补贴' %}selected{% endif %}>良种补贴</option>
+        <option value="有机认证补贴" {% if prefill.type == '有机认证补贴' %}selected{% endif %}>有机认证补贴</option>
+        <option value="冷链物流补贴" {% if prefill.type == '冷链物流补贴' %}selected{% endif %}>冷链物流补贴</option>
+        <option value="电商销售补贴" {% if prefill.type == '电商销售补贴' %}selected{% endif %}>电商销售补贴</option>
+        <option value="其他" {% if prefill.type == '其他' %}selected{% endif %}>其他</option>
+      </select>
+    </div>
+    <div class="mb-3">
+      <label class="form-label fw-bold">申请金额（元）</label>
+      <input type="number" name="amount" class="form-control" step="0.01" min="0.01" max="9999999"
+             placeholder="请输入申请金额" value="{{ prefill.amount|default:'' }}" required>
+    </div>
+    <div class="mb-4">
+      <label class="form-label fw-bold">证明材料（URL，可选，最多3个）</label>
+      <input type="url" name="document_urls" class="form-control mb-2" placeholder="https://example.com/doc1.pdf">
+      <input type="url" name="document_urls" class="form-control mb-2" placeholder="https://example.com/doc2.pdf">
+      <input type="url" name="document_urls" class="form-control" placeholder="https://example.com/doc3.pdf">
+      <small class="text-muted">可上传证明材料链接，如土地承包合同、农机发票、认证证书等</small>
+    </div>
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-success"><i class="bi bi-send"></i> 提交申请</button>
+      <a href="{% url 'accounts:subsidy_list' %}" class="btn btn-outline-secondary">取消</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

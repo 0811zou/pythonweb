@@ -1,6 +1,6 @@
-{% extends 'base.html' %}
-{% block title %}结算 - 智溯农链{% endblock %}
-{% block content %}
+{% extends base_template %}
+{% block title %}结算 - 智农溯源{% endblock %}
+{% block body %}
 <div class="container py-4" style="max-width:700px;">
   <h4 class="fw-bold mb-4"><i class="bi bi-credit-card text-success"></i> 确认订单</h4>
 
@@ -19,21 +19,37 @@
       {% endfor %}
     </div>
     <div class="card-footer bg-white text-end">
-      <strong>合计：<span class="text-success fs-5">¥{{ cart.total_price|floatformat:2 }}</span></strong>
+      <strong>合计：<span class="text-success fs-5">¥{{ checkout_total|default:cart.total_price|floatformat:2 }}</span></strong>
     </div>
   </div>
 
   <form method="post">
     {% csrf_token %}
     <div class="card">
-      <div class="card-header bg-white"><strong><i class="bi bi-geo-alt"></i> 收货信息</strong></div>
+      <div class="card-header bg-white"><strong><i class="bi bi-person"></i> 收货信息</strong></div>
       <div class="card-body">
+        <div class="row mb-3">
+          <div class="col-md-6 mb-2 mb-md-0">
+            <label class="form-label">收货人姓名 <span class="text-danger">*</span></label>
+            <input type="text" name="receiver_name" class="form-control" required
+                   placeholder="请输入收货人姓名" value="{{ request.user.last_name|default:'' }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">联系电话 <span class="text-danger">*</span></label>
+            <input type="tel" name="phone" class="form-control" required
+                   placeholder="请输入联系电话" maxlength="20">
+          </div>
+        </div>
         <div class="mb-3">
           <label class="form-label">收货地址 <span class="text-danger">*</span></label>
-          <input type="text" name="address" class="form-control" required placeholder="省/市/区 详细地址">
+          <input type="text" name="address" class="form-control" required
+                 placeholder="例如：广东省广州市天河区XX路XX号">
+          <div class="form-text">请填写完整收货地址，包括省/市/区和详细地址</div>
         </div>
-        <button type="submit" class="btn btn-success w-100"><i class="bi bi-check-lg"></i> 提交订单</button>
-        <a href="{% url 'cart_view' %}" class="btn btn-outline-secondary w-100 mt-2">返回购物车</a>
+        <button type="submit" class="btn btn-success w-100 btn-lg">
+          <i class="bi bi-credit-card"></i> 提交订单并支付
+        </button>
+        <a href="{% url 'trade:cart_view'  %}" class="btn btn-outline-secondary w-100 mt-2">返回购物车</a>
       </div>
     </div>
   </form>

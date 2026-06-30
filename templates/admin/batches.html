@@ -1,83 +1,56 @@
-{% extends 'base.html' %}
-{% block title %}批次审核 - 智溯农链{% endblock %}
-{% block content %}
-<style>
-.admin-sidebar { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-.admin-sidebar .nav-link { border-radius: 8px; padding: 10px 16px; color: #555; }
-.admin-sidebar .nav-link:hover { background: #e8f5e9; color: #2d8a4e; }
-.admin-sidebar .nav-link.active { background: #2d8a4e; color: #fff; }
-</style>
-<div class="container-fluid py-4">
-  <div class="row">
-    <div class="col-md-2 mb-3">
-      <div class="admin-sidebar">
-        <h6 class="fw-bold mb-3"><i class="bi bi-shield-lock text-danger"></i> 管理后台</h6>
-        <nav class="nav flex-column">
-          <a class="nav-link" href="{% url 'admin_dashboard' %}"><i class="bi bi-speedometer2"></i> 概览</a>
-          <a class="nav-link" href="{% url 'admin_products' %}"><i class="bi bi-basket"></i> 产品审核</a>
-          <a class="nav-link active" href="{% url 'admin_batches' %}"><i class="bi bi-box-seam"></i> 批次审核</a>
-          <a class="nav-link" href="{% url 'admin_users' %}"><i class="bi bi-people"></i> 用户管理</a>
-          <hr class="my-2">
-          <a class="nav-link" href="{% url 'export_orders' %}"><i class="bi bi-download"></i> 导出订单</a>
-          <a class="nav-link" href="{% url 'export_products' %}"><i class="bi bi-download"></i> 导出产品</a>
-          <a class="nav-link" href="/admin/" target="_blank"><i class="bi bi-gear"></i> Django Admin</a>
-        </nav>
-      </div>
-    </div>
-    <div class="col-md-10">
-      <h4 class="fw-bold mb-4"><i class="bi bi-box-seam text-danger"></i> 批次审核</h4>
-      <div class="btn-group mb-3">
-        <a href="?status=pending" class="btn btn-sm {% if current_status == 'pending' %}btn-warning{% else %}btn-outline-warning{% endif %}">待审核</a>
-        <a href="?status=approved" class="btn btn-sm {% if current_status == 'approved' %}btn-success{% else %}btn-outline-success{% endif %}">已通过</a>
-        <a href="?status=rejected" class="btn btn-sm {% if current_status == 'rejected' %}btn-danger{% else %}btn-outline-danger{% endif %}">未通过</a>
-        <a href="?status=all" class="btn btn-sm {% if current_status == 'all' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">全部</a>
-      </div>
-      <div class="card">
-        <div class="card-body p-0">
-          <table class="table table-hover mb-0">
-            <thead class="table-light">
-              <tr><th>批次编号</th><th>产品</th><th>农户</th><th>数量</th><th>状态</th><th>创建时间</th><th>操作</th></tr>
-            </thead>
-            <tbody>
-              {% for b in batches %}
-              <tr>
-                <td><code>{{ b.batch_code }}</code></td>
-                <td><strong>{{ b.product.name }}</strong></td>
-                <td>{{ b.product.farmer.user.username }}</td>
-                <td>{{ b.quantity }}</td>
-                <td>
-                  {% if b.status == 'approved' %}<span class="badge bg-success">已通过</span>
-                  {% elif b.status == 'pending' %}<span class="badge bg-warning text-dark">待审核</span>
-                  {% elif b.status == 'rejected' %}<span class="badge bg-danger">未通过</span>
-                  {% else %}<span class="badge bg-secondary">{{ b.status }}</span>{% endif %}
-                </td>
-                <td class="small">{{ b.created_at|date:'Y-m-d' }}</td>
-                <td>
-                  {% if b.status == 'pending' %}
-                  <form method="post" action="{% url 'admin_batch_review' b.id 'approve' %}" class="d-inline">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check"></i> 通过</button>
-                  </form>
-                  <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ b.id }}"><i class="bi bi-x"></i> 拒绝</button>
-                  <div class="modal fade" id="rejectModal{{ b.id }}"><div class="modal-dialog"><form method="post" action="{% url 'admin_batch_review' b.id 'reject' %}" class="modal-content">
-                    {% csrf_token %}<div class="modal-header"><h5 class="modal-title">拒绝批次 {{ b.batch_code }}</h5></div>
-                    <div class="modal-body"><textarea name="note" class="form-control" rows="3" placeholder="填写拒绝原因..."></textarea></div>
-                    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button type="submit" class="btn btn-danger">确认拒绝</button></div>
-                  </form></div></div>
-                  {% else %}
-                  <span class="text-muted small">——</span>
-                  {% endif %}
-                  <a href="{% url 'farmer_batch_detail' b.id %}" class="btn btn-sm btn-outline-success"><i class="bi bi-eye"></i></a>
-                </td>
-              </tr>
-              {% empty %}
-              <tr><td colspan="7" class="text-center py-4 text-muted">暂无批次</td></tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+{% extends 'admin/panel_base.html' %}
+{% block title %}批次审核 - 智农溯源{% endblock %}
+{% block body %}
+<h4 class="fw-bold mb-4"><i class="bi bi-box-seam text-danger"></i> 批次审核</h4>
+<div class="btn-group mb-3">
+  <a href="?status=pending" class="btn btn-sm {% if current_status == 'pending' %}btn-warning{% else %}btn-outline-warning{% endif %}">待审核</a>
+  <a href="?status=approved" class="btn btn-sm {% if current_status == 'approved' %}btn-success{% else %}btn-outline-success{% endif %}">已通过</a>
+  <a href="?status=rejected" class="btn btn-sm {% if current_status == 'rejected' %}btn-danger{% else %}btn-outline-danger{% endif %}">未通过</a>
+  <a href="?status=all" class="btn btn-sm {% if current_status == 'all' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">全部</a>
+</div>
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover mb-0">
+      <thead class="table-light">
+        <tr><th>批次编号</th><th>产品</th><th>农户</th><th>数量</th><th>状态</th><th>创建时间</th><th>操作</th></tr>
+      </thead>
+      <tbody>
+        {% for b in batches %}
+        <tr>
+          <td><code>{{ b.batch_code }}</code></td>
+          <td><strong>{{ b.product.name }}</strong></td>
+          <td>{{ b.product.farmer.user.username }}</td>
+          <td>{{ b.quantity }}</td>
+          <td>
+            {% if b.status == 'approved' %}<span class="badge bg-success">已通过</span>
+            {% elif b.status == 'pending' %}<span class="badge bg-warning text-dark">待审核</span>
+            {% elif b.status == 'rejected' %}<span class="badge bg-danger">未通过</span>
+            {% else %}<span class="badge bg-secondary">{{ b.status }}</span>{% endif %}
+          </td>
+          <td class="small">{{ b.created_at|date:'Y-m-d' }}</td>
+          <td>
+            {% if b.status == 'pending' %}
+            <form method="post" action="{% url 'admin_panel:batch_review' b.id 'approve' %}" class="d-inline">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check"></i> 通过</button>
+            </form>
+            <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ b.id }}"><i class="bi bi-x"></i> 拒绝</button>
+            <div class="modal fade" id="rejectModal{{ b.id }}"><div class="modal-dialog"><form method="post" action="{% url 'admin_panel:batch_review' b.id 'reject' %}" class="modal-content">
+              {% csrf_token %}<div class="modal-header"><h5 class="modal-title">拒绝批次 {{ b.batch_code }}</h5></div>
+              <div class="modal-body"><textarea name="note" class="form-control" rows="3" placeholder="填写拒绝原因..."></textarea></div>
+              <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button type="submit" class="btn btn-danger">确认拒绝</button></div>
+            </form></div></div>
+            {% else %}
+            <span class="text-muted small">——</span>
+            {% endif %}
+            <a href="{% url 'products:farmer_batch_detail' b.id %}" class="btn btn-sm btn-outline-success"><i class="bi bi-eye"></i></a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center py-4 text-muted">暂无批次</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 </div>
 {% endblock %}

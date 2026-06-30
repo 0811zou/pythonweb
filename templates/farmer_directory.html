@@ -1,0 +1,84 @@
+{% extends base_template %}
+{% block title %}入驻农户 - 智农溯源{% endblock %}
+{% block body %}
+<section class="py-4">
+  <div class="container">
+    <div class="text-center mb-4">
+      <span style="font-size:2rem;">👨‍🌾</span>
+      <h2 class="section-title mt-2">入驻农户</h2>
+      <p class="section-subtitle">共 {{ total }} 位农户，来自全国各地</p>
+    </div>
+
+    <div class="text-center mb-4">
+      {% if user.is_authenticated %}
+        {% if is_farmer %}
+        <a href="{% url 'accounts:farmer_shop' user.farmerprofile.id %}" class="btn btn-success btn-lg">
+          <i class="bi bi-shop"></i> 进入我的店铺
+        </a>
+        {% else %}
+        <div class="alert alert-info d-inline-block text-start" style="max-width:500px;">
+          <i class="bi bi-info-circle"></i> <strong>您是消费者账号</strong><br>
+          <span class="small">如需成为入驻农户，请使用农户账号登录，或<a href="{% url 'accounts:register' %}">注册新的农户账号</a>。</span>
+        </div>
+        {% endif %}
+      {% else %}
+      <a href="{% url 'accounts:login' %}?next={% url 'core:apply_join' %}%3Ftype%3Dfarmer" class="btn btn-outline-success btn-lg">
+        <i class="bi bi-box-arrow-in-right"></i> 登录后申请入驻
+      </a>
+      <div class="small text-muted mt-1">还没有账号？<a href="{% url 'accounts:register' %}">立即注册农户账号</a></div>
+      {% endif %}
+    </div>
+
+    {% if farmers %}
+    <div class="row g-2">
+      {% for f in farmers %}
+      <div class="col-lg-3 col-md-4 col-6">
+        <a href="{% url 'accounts:farmer_shop' f.id %}" class="text-decoration-none">
+          <div class="card h-100 farmer-card">
+            <div class="card-body">
+              <div class="d-flex align-items-center gap-2 mb-1">
+                <div class="farmer-avatar-sm"><i class="bi bi-person-circle"></i></div>
+                <div>
+                  <div class="fw-bold small text-dark">{{ f.user.username }}</div>
+                  <div class="text-muted" style="font-size:0.7rem;">{{ f.address|default:''|truncatechars:12 }}</div>
+                </div>
+              </div>
+              <div class="d-flex justify-content-between align-items-center mt-2">
+                <span class="badge bg-success bg-opacity-10 text-success">{{ f.product_count }}件产品</span>
+                {% if f.verified %}<span class="text-success" style="font-size:0.7rem;"><i class="bi bi-patch-check-fill"></i></span>{% endif %}
+              </div>
+            </div>
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-5 text-muted">
+      <i class="bi bi-person-x" style="font-size:3rem;display:block;margin-bottom:12px;"></i>
+      <p>暂无农户入驻</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<style>
+.farmer-card {
+  transition: all 0.2s;
+  border: 1px solid #e9ecef;
+}
+.farmer-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+  border-color: var(--primary);
+}
+.farmer-avatar-sm {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: #e8f5e9;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2rem; color: #2d8a4e;
+  flex-shrink: 0;
+}
+</style>
+{% endblock %}

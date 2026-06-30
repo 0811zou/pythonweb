@@ -1,127 +1,137 @@
-{% extends 'base.html' %}
-{% block title %}农户工作台 - 智溯农链{% endblock %}
-{% block content %}
-<style>
-.farmer-sidebar { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-.farmer-sidebar .nav-link { border-radius: 8px; padding: 10px 16px; color: #555; transition: all 0.2s; }
-.farmer-sidebar .nav-link:hover { background: #e8f5e9; color: #2d8a4e; }
-.farmer-sidebar .nav-link.active { background: #2d8a4e; color: #fff; }
-.stat-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center; transition: transform 0.2s; }
-.stat-card:hover { transform: translateY(-3px); }
-.stat-number { font-size: 2rem; font-weight: 700; color: var(--primary); }
-</style>
-<div class="container-fluid py-4">
-  <div class="row">
-    <div class="col-md-2 mb-3">
-      <div class="farmer-sidebar">
-        <div class="text-center mb-3 pb-2 border-bottom">
-          <div style="width:56px;height:56px;border-radius:50%;background:#e8f5e9;display:flex;align-items:center;justify-content:center;font-size:1.8rem;color:#2d8a4e;margin:0 auto 8px;">
-            <i class="bi bi-person-circle"></i>
-          </div>
-          <h6 class="fw-bold mb-0">{{ user.username }}</h6>
-          <small class="text-muted">农户</small>
+{% extends 'farmer/base.html' %}
+{% block title %}农户工作台 - 智农溯源{% endblock %}
+{% block body %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="fw-bold mb-0"><i class="bi bi-speedometer2 text-success"></i> 农户工作台</h4>
+  <a href="{% url 'products:farmer_product_create'  %}" class="btn btn-success"><i class="bi bi-plus-lg"></i> 发布新产品</a>
+</div>
+<!-- 数据概览 -->
+<div class="row g-3 mb-4">
+  <div class="col-md-3 col-6">
+    <div class="stat-card"><div class="stat-number">{{ stats.total }}</div><div class="text-muted">全部产品</div></div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="stat-card"><div class="stat-number" style="color:#27ae60;">{{ stats.approved }}</div><div class="text-muted">已上架</div></div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="stat-card"><div class="stat-number" style="color:#f39c12;">{{ stats.pending }}</div><div class="text-muted">待审核</div></div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="stat-card"><div class="stat-number" style="color:#95a5a6;">{{ stats.draft }}</div><div class="text-muted">草稿</div></div>
+  </div>
+</div>
+<!-- 批次概览 -->
+<div class="row g-3 mb-4">
+  <div class="col-md-4 col-6">
+    <div class="stat-card" style="padding:14px;">
+      <div class="stat-number" style="font-size:1.5rem;color:#2d8a4e;">{{ stats.batches_total }}</div>
+      <div class="text-muted">全部批次</div>
+    </div>
+  </div>
+  <div class="col-md-4 col-6">
+    <div class="stat-card" style="padding:14px;">
+      <div class="stat-number" style="font-size:1.5rem;color:#27ae60;">{{ stats.batches_approved }}</div>
+      <div class="text-muted">已通过</div>
+    </div>
+  </div>
+  <div class="col-md-4 col-6">
+    <div class="stat-card" style="padding:14px;">
+      <div class="stat-number" style="font-size:1.5rem;color:#f39c12;">{{ stats.batches_pending }}</div>
+      <div class="text-muted">待质检</div>
+    </div>
+  </div>
+</div>
+
+<!-- 实用工具面板 -->
+<div class="row g-3 mb-4">
+  {% if matching_demands %}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong><i class="bi bi-arrow-left-right text-warning"></i> 匹配的需求</strong>
+        <a href="{% url 'marketplace:list'  %}?type=demand" class="btn btn-sm btn-outline-warning">查看全部</a>
+      </div>
+      <div class="card-body">
+        {% for d in matching_demands %}
+        <div class="border-bottom pb-2 mb-2">
+          <a href="{% url 'marketplace:detail' d.id %}" class="text-decoration-none">
+            <strong>{{ d.product_name }}</strong>
+          </a>
+          <span class="badge bg-info text-dark ms-1">{{ d.quantity }}{{ d.unit }}</span>
+          <br><small class="text-muted">{{ d.author.username }} · {{ d.region }}</small>
         </div>
-        <nav class="nav flex-column">
-          <a class="nav-link active" href="{% url 'farmer_dashboard' %}"><i class="bi bi-speedometer2"></i> 工作台</a>
-          <a class="nav-link" href="{% url 'farmer_batch_list' %}"><i class="bi bi-box-seam"></i> 批次管理</a>
-          <a class="nav-link" href="{% url 'farmer_shop_settings' %}"><i class="bi bi-shop"></i> 店铺设置</a>
-          <a class="nav-link" href="{% url 'farmer_product_create' %}"><i class="bi bi-gear"></i> 管理产品</a>
-          <a class="nav-link" href="{% url 'farmer_orders' %}"><i class="bi bi-receipt"></i> 订单管理</a>
-          <a class="nav-link" href="{% url 'market_analysis' %}"><i class="bi bi-graph-up-arrow"></i> 市场分析</a>
-        </nav>
+        {% endfor %}
       </div>
     </div>
-    <div class="col-md-10">
-      <div class="d-flex justify-content-between align-items-center mb-4">
-        <h4 class="fw-bold mb-0"><i class="bi bi-speedometer2 text-success"></i> 农户工作台</h4>
-        <a href="{% url 'farmer_product_create' %}" class="btn btn-success"><i class="bi bi-plus-lg"></i> 发布新产品</a>
+  </div>
+  {% endif %}
+  {% if relevant_guides %}
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <strong><i class="bi bi-book text-success"></i> 推荐农技知识</strong>
+        <a href="{% url 'knowledge:list'  %}" class="btn btn-sm btn-outline-success">更多</a>
       </div>
-      <!-- 数据概览 -->
-      <div class="row g-3 mb-4">
-        <div class="col-md-3 col-6">
-          <div class="stat-card"><div class="stat-number">{{ stats.total }}</div><div class="text-muted">全部产品</div></div>
+      <div class="card-body">
+        {% for g in relevant_guides %}
+        <div class="mb-2">
+          <a href="{% url 'knowledge:detail' g.id %}" class="text-decoration-none">{{ g.title }}</a>
+          <br><small class="text-muted">{{ g.get_category_display }} · {{ g.get_crop_type_display }}</small>
         </div>
-        <div class="col-md-3 col-6">
-          <div class="stat-card"><div class="stat-number" style="color:#27ae60;">{{ stats.approved }}</div><div class="text-muted">已上架</div></div>
-        </div>
-        <div class="col-md-3 col-6">
-          <div class="stat-card"><div class="stat-number" style="color:#f39c12;">{{ stats.pending }}</div><div class="text-muted">待审核</div></div>
-        </div>
-        <div class="col-md-3 col-6">
-          <div class="stat-card"><div class="stat-number" style="color:#95a5a6;">{{ stats.draft }}</div><div class="text-muted">草稿</div></div>
-        </div>
+        {% endfor %}
       </div>
-      <!-- 批次概览 -->
-      <div class="row g-3 mb-4">
-        <div class="col-md-4 col-6">
-          <div class="stat-card" style="padding:14px;">
-            <div class="stat-number" style="font-size:1.5rem;color:#2d8a4e;">{{ stats.batches_total }}</div>
-            <div class="text-muted">全部批次</div>
-          </div>
-        </div>
-        <div class="col-md-4 col-6">
-          <div class="stat-card" style="padding:14px;">
-            <div class="stat-number" style="font-size:1.5rem;color:#27ae60;">{{ stats.batches_approved }}</div>
-            <div class="text-muted">已通过</div>
-          </div>
-        </div>
-        <div class="col-md-4 col-6">
-          <div class="stat-card" style="padding:14px;">
-            <div class="stat-number" style="font-size:1.5rem;color:#f39c12;">{{ stats.batches_pending }}</div>
-            <div class="text-muted">待质检</div>
-          </div>
-        </div>
-      </div>
-      <!-- 产品列表 -->
-      <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center" style="background:#fff;">
-          <span><i class="bi bi-basket text-success"></i> <strong>我的产品</strong></span>
-          <small class="text-muted">共 {{ stats.total }} 个产品</small>
-        </div>
-        <div class="card-body p-0">
-          <div class="table-responsive">
-            <table class="table table-hover mb-0">
-              <thead class="table-light"><tr><th>产品</th><th>价格</th><th>状态</th><th>审核意见</th><th>时间</th><th>操作</th></tr></thead>
-              <tbody>
-                {% for p in products %}
-                <tr>
-                  <td><strong>{{ p.name }}</strong></td>
-                  <td>¥{{ p.price }}/{{ p.unit }}</td>
-                  <td>
-                    {% if p.status == 'approved' %}<span class="badge bg-success">已上架</span>
-                    {% elif p.status == 'pending' %}<span class="badge bg-warning text-dark">待审核</span>
-                    {% elif p.status == 'rejected' %}<span class="badge bg-danger">未通过</span>
-                    {% else %}<span class="badge bg-secondary">草稿</span>{% endif %}
-                  </td>
-                  <td class="small text-muted">{{ p.review_note|default:'-' }}</td>
-                  <td class="small">{{ p.created_at|date:'m-d' }}</td>
-                  <td>
-                    {% if p.status == 'draft' or p.status == 'rejected' %}
-                      <a href="{% url 'farmer_product_edit' p.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
-                    {% endif %}
-                    {% if p.status == 'draft' %}
-                      <form method="post" action="{% url 'farmer_product_submit' p.pk %}" class="d-inline">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-sm btn-outline-success"><i class="bi bi-send"></i></button>
-                      </form>
-                    {% endif %}
-                    <form method="post" action="{% url 'farmer_product_delete' p.pk %}" class="d-inline" onsubmit="return confirm('确定删除「{{ p.name }}」？')">
-                      {% csrf_token %}
-                      <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                    </form>
-                  </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="6" class="text-center py-4 text-muted">
-                  <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
-                  暂无产品<br><a href="{% url 'farmer_product_create' %}" class="btn btn-success btn-sm mt-2">发布第一个产品</a>
-                </td></tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- 产品列表 -->
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center" style="background:#fff;">
+    <span><i class="bi bi-basket text-success"></i> <strong>我的产品</strong></span>
+    <small class="text-muted">共 {{ stats.total }} 个产品</small>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light"><tr><th>产品</th><th>价格</th><th>状态</th><th>审核意见</th><th>时间</th><th>操作</th></tr></thead>
+        <tbody>
+          {% for p in products %}
+          <tr>
+            <td><strong>{{ p.name }}</strong></td>
+            <td>¥{{ p.price }}/{{ p.unit }}</td>
+            <td>
+              {% if p.status == 'approved' %}<span class="badge bg-success">已上架</span>
+              {% elif p.status == 'pending' %}<span class="badge bg-warning text-dark">待审核</span>
+              {% elif p.status == 'rejected' %}<span class="badge bg-danger">未通过</span>
+              {% else %}<span class="badge bg-secondary">草稿</span>{% endif %}
+            </td>
+            <td class="small text-muted">{{ p.review_note|default:'-' }}</td>
+            <td class="small">{{ p.created_at|date:'m-d' }}</td>
+            <td>
+              {% if p.status == 'draft' or p.status == 'rejected' %}
+                <a href="{% url 'products:farmer_product_edit' p.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+              {% endif %}
+              {% if p.status == 'draft' %}
+                <form method="post" action="{% url 'products:farmer_product_submit' p.pk %}" class="d-inline">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-success"><i class="bi bi-send"></i></button>
+                </form>
+              {% endif %}
+              <form method="post" action="{% url 'products:farmer_product_delete' p.pk %}" class="d-inline" onsubmit="return confirm('确定删除「{{ p.name }}」？')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+              </form>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="text-center py-4 text-muted">
+            <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
+            暂无产品<br><a href="{% url 'products:farmer_product_create'  %}" class="btn btn-success btn-sm mt-2">发布第一个产品</a>
+          </td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 </div>

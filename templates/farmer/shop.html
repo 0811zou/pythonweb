@@ -1,6 +1,6 @@
-{% extends 'base.html' %}
-{% block title %}{{ farmer.user.username }}的店铺 - 智溯农链{% endblock %}
-{% block content %}
+{% extends base_template %}
+{% block title %}{{ farmer.user.username }}的店铺 - 智农溯源{% endblock %}
+{% block body %}
 <div class="container py-4">
 
   <!-- 店铺头部 -->
@@ -20,16 +20,48 @@
       <p class="text-muted mb-2">
         <i class="bi bi-geo-alt"></i> {{ farmer.address|default:'地址未填写' }}
       </p>
-      {% if farmer.cooperative %}
-      <span class="badge bg-success"><i class="bi bi-building"></i> {{ farmer.cooperative.name }}</span>
+      {% if avg_rating %}
+      <p class="mb-1">
+        <span class="text-warning">
+          {% for i in "12345" %}{% if forloop.counter <= avg_rating|floatformat:0|add:"0" %}<i class="bi bi-star-fill"></i>{% else %}<i class="bi bi-star"></i>{% endif %}{% endfor %}
+        </span>
+        <small class="text-muted ms-1">{{ avg_rating|floatformat:1 }} ({{ review_count }} 条评价)</small>
+      </p>
       {% endif %}
       <p class="mt-2 mb-0 text-muted small">{{ products|length }} 个在售产品 · {{ batches|length }}+ 个批次</p>
     </div>
   </div>
 
+  <!-- 农场故事 -->
+  {% if farmer.farm_story %}
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h5><i class="bi bi-journal-text text-success"></i> 农场故事</h5>
+      <p class="mb-0" style="white-space:pre-line;line-height:1.8;">{{ farmer.farm_story }}</p>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 农场照片 -->
+  {% if farmer.farm_photos %}
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      <h5><i class="bi bi-images text-success"></i> 农场实拍</h5>
+      <div class="row g-2">
+        {% for photo_url in farmer.farm_photos %}
+        <div class="col-md-3 col-6">
+          <img src="{{ photo_url }}" class="img-fluid rounded" style="height:180px;width:100%;object-fit:cover;" alt="农场照片" onerror="this.parentElement.style.display='none';">
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- 在售产品 -->
   <h4 class="fw-bold mb-3"><i class="bi bi-basket text-success"></i> 在售产品</h4>
   {% if products %}
-  <div class="row g-3">
+  <div class="row g-3 mb-4">
     {% for p in products %}
     <div class="col-md-3 col-6">
       <div class="card h-100 shadow-sm">
@@ -45,7 +77,13 @@
           <span class="badge bg-success bg-opacity-10 text-success mb-2">{{ p.category|default:'农产品' }}</span>
           <div class="d-flex justify-content-between align-items-center">
             <span class="fw-bold text-success">¥{{ p.price }}<small>/{{ p.unit }}</small></span>
-            <a href="{% url 'product_detail' p.id %}" class="btn btn-sm btn-outline-success">详情</a>
+            <a href="{% url 'products:detail' p.id %}" class="btn btn-sm btn-outline-success">详情</a>
+          </div>
+          <!-- 价格透明标识 -->
+          <div class="mt-2">
+            <span class="badge bg-success bg-opacity-10 text-success" style="font-size:0.7rem;">
+              <i class="bi bi-heart"></i> 平台零利润 · 农户直售
+            </span>
           </div>
         </div>
       </div>
@@ -59,6 +97,34 @@
   </div>
   {% endif %}
 
+  <!-- 顾客评价 -->
+  <h4 class="fw-bold mb-3"><i class="bi bi-star text-warning"></i> 顾客评价</h4>
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+      {% if reviews %}
+        {% for r in reviews %}
+        <div class="border-bottom pb-3 mb-3">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <strong>{{ r.buyer.username }}</strong>
+              {% if r.product %}<small class="text-muted ms-2">购买了 {{ r.product.name }}</small>{% endif %}
+            </div>
+            <div>
+              <span class="text-warning">
+                {% for i in "12345" %}{% if forloop.counter <= r.rating %}<i class="bi bi-star-fill"></i>{% else %}<i class="bi bi-star"></i>{% endif %}{% endfor %}
+              </span>
+              <small class="text-muted ms-2">{{ r.created_at|date:'Y-m-d' }}</small>
+            </div>
+          </div>
+          {% if r.comment %}<p class="mb-0 mt-1">{{ r.comment }}</p>{% endif %}
+        </div>
+        {% endfor %}
+      {% else %}
+        <p class="text-muted text-center mb-0">暂无评价</p>
+      {% endif %}
+    </div>
+  </div>
+
   {% if batches %}
   <h4 class="fw-bold mt-4 mb-3"><i class="bi bi-box-seam text-success"></i> 最近批次</h4>
   <div class="table-responsive">
@@ -69,7 +135,7 @@
       <tbody>
         {% for b in batches %}
         <tr>
-          <td><a href="{% url 'trace' b.batch_code %}"><code>{{ b.batch_code }}</code></a></td>
+          <td><a href="{% url 'traceability:trace' b.batch_code %}"><code>{{ b.batch_code }}</code></a></td>
           <td>{{ b.product.name }}</td>
           <td>{{ b.harvest_date|default:'-' }}</td>
           <td>{{ b.quantity }}</td>

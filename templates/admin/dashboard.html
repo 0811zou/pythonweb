@@ -1,60 +1,62 @@
-{% extends 'base.html' %}
-{% block title %}管理后台 - 智溯农链{% endblock %}
-{% block content %}
-<style>
-.admin-sidebar { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-.admin-sidebar .nav-link { border-radius: 8px; padding: 10px 16px; color: #555; }
-.admin-sidebar .nav-link:hover { background: #e8f5e9; color: #2d8a4e; }
-.admin-sidebar .nav-link.active { background: #2d8a4e; color: #fff; }
-.stat-card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); text-align: center; }
-.stat-number { font-size: 2rem; font-weight: 700; }
-</style>
-<div class="container-fluid py-4">
-  <div class="row">
-    <div class="col-md-2 mb-3">
-      <div class="admin-sidebar">
-        <h6 class="fw-bold mb-3"><i class="bi bi-shield-lock text-danger"></i> 管理后台</h6>
-        <nav class="nav flex-column">
-          <a class="nav-link active" href="{% url 'admin_dashboard' %}"><i class="bi bi-speedometer2"></i> 概览</a>
-          <a class="nav-link" href="{% url 'admin_products' %}"><i class="bi bi-basket"></i> 产品审核</a>
-          <a class="nav-link" href="{% url 'admin_batches' %}"><i class="bi bi-box-seam"></i> 批次审核</a>
-          <a class="nav-link" href="{% url 'admin_users' %}"><i class="bi bi-people"></i> 用户管理</a>
-          <a class="nav-link" href="/admin/" target="_blank"><i class="bi bi-gear"></i> Django Admin</a>
-          <a class="nav-link" href="/admin/core/announcement/" target="_blank"><i class="bi bi-megaphone"></i> 公告管理</a>
-          <hr class="my-2">
-          <a class="nav-link" href="{% url 'export_orders' %}"><i class="bi bi-download"></i> 导出订单</a>
-          <a class="nav-link" href="{% url 'export_products' %}"><i class="bi bi-download"></i> 导出产品</a>
-        </nav>
-      </div>
+{% extends 'admin/panel_base.html' %}
+{% block title %}管理后台 - 智农溯源{% endblock %}
+{% block body %}
+<h4 class="fw-bold mb-4"><i class="bi bi-speedometer2 text-danger"></i> 管理概览</h4>
+
+<div class="row g-3 admin-stat-row mb-4">
+  <div class="col-md-3 col-6">
+    <div class="stat-card" style="border-top-color:#e74c3c;">
+      <div class="stat-icon" style="color:#e74c3c;"><i class="bi bi-hourglass-split"></i></div>
+      <div class="stat-number" style="color:#e74c3c;">{{ products_pending }}</div>
+      <div class="stat-label">待审核产品</div>
     </div>
-    <div class="col-md-10">
-      <h4 class="fw-bold mb-4"><i class="bi bi-speedometer2 text-danger"></i> 管理概览</h4>
-      <div class="row g-3 mb-4">
-        <div class="col-md-3 col-6"><div class="stat-card"><div class="stat-number" style="color:#e74c3c;">{{ products_pending }}</div><div class="text-muted">待审核产品</div></div></div>
-        <div class="col-md-3 col-6"><div class="stat-card"><div class="stat-number" style="color:#f39c12;">{{ batches_pending }}</div><div class="text-muted">待审批次</div></div></div>
-        <div class="col-md-3 col-6"><div class="stat-card"><div class="stat-number" style="color:#2d8a4e;">{{ products_total }}</div><div class="text-muted">产品总数</div></div></div>
-        <div class="col-md-3 col-6"><div class="stat-card"><div class="stat-number" style="color:#3498db;">{{ farmers_total }}</div><div class="text-muted">入驻农户</div></div></div>
-        <div class="col-md-3 col-6"><div class="stat-card"><div class="stat-number" style="color:#9b59b6;">{{ users_total }}</div><div class="text-muted">注册用户</div></div></div>
-      </div>
-      <div class="row g-3">
-        <div class="col-md-6">
-          <div class="card"><div class="card-body text-center py-5">
-            <i class="bi bi-basket" style="font-size:3rem;color:#2d8a4e;"></i>
-            <h5 class="mt-2">产品审核</h5>
-            <p class="text-muted">{{ products_pending }} 个产品待审核</p>
-            <a href="{% url 'admin_products' %}" class="btn btn-primary">去审核</a>
-          </div></div>
-        </div>
-        <div class="col-md-6">
-          <div class="card"><div class="card-body text-center py-5">
-            <i class="bi bi-people" style="font-size:3rem;color:#3498db;"></i>
-            <h5 class="mt-2">用户管理</h5>
-            <p class="text-muted">共 {{ users_total }} 个注册用户</p>
-            <a href="{% url 'admin_users' %}" class="btn btn-primary">查看用户</a>
-          </div></div>
-        </div>
-      </div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="stat-card" style="border-top-color:#f39c12;">
+      <div class="stat-icon" style="color:#f39c12;"><i class="bi bi-box-seam"></i></div>
+      <div class="stat-number" style="color:#f39c12;">{{ batches_pending }}</div>
+      <div class="stat-label">待审批次</div>
     </div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="stat-card" style="border-top-color:#2d8a4e;">
+      <div class="stat-icon" style="color:#2d8a4e;"><i class="bi bi-basket"></i></div>
+      <div class="stat-number" style="color:#2d8a4e;">{{ products_total }}</div>
+      <div class="stat-label">产品总数</div>
+    </div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="stat-card" style="border-top-color:#3498db;">
+      <div class="stat-icon" style="color:#3498db;"><i class="bi bi-person-check"></i></div>
+      <div class="stat-number" style="color:#3498db;">{{ farmers_total }}</div>
+      <div class="stat-label">入驻农户</div>
+    </div>
+  </div>
+  <div class="col-md-3 col-6">
+    <div class="stat-card" style="border-top-color:#9b59b6;">
+      <div class="stat-icon" style="color:#9b59b6;"><i class="bi bi-people"></i></div>
+      <div class="stat-number" style="color:#9b59b6;">{{ users_total }}</div>
+      <div class="stat-label">注册用户</div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card"><div class="card-body text-center py-5">
+      <i class="bi bi-basket" style="font-size:3rem;color:#2d8a4e;"></i>
+      <h5 class="mt-2">产品审核</h5>
+      <p class="text-muted">{{ products_pending }} 个产品待审核</p>
+      <a href="{% url 'admin_panel:products'  %}" class="btn btn-primary">去审核</a>
+    </div></div>
+  </div>
+  <div class="col-md-6">
+    <div class="card"><div class="card-body text-center py-5">
+      <i class="bi bi-people" style="font-size:3rem;color:#3498db;"></i>
+      <h5 class="mt-2">用户管理</h5>
+      <p class="text-muted">共 {{ users_total }} 个注册用户</p>
+      <a href="{% url 'admin_panel:users'  %}" class="btn btn-primary">查看用户</a>
+    </div></div>
   </div>
 </div>
 {% endblock %}

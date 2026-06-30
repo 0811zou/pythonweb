@@ -1,15 +1,22 @@
-{% extends 'base.html' %}
-{% block title %}我的订单 - 智溯农链{% endblock %}
-{% block content %}
+{% extends base_template %}
+{% block title %}我的订单 - 智农溯源{% endblock %}
+{% block body %}
 <div class="container py-4">
   <h4 class="fw-bold mb-4"><i class="bi bi-receipt text-success"></i> 我的订单</h4>
+
+  {% if messages %}
+    {% for m in messages %}<div class="alert alert-{{ m.tags }} alert-dismissible fade show">{{ m }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endfor %}
+  {% endif %}
 
   {% if orders %}
     {% for order in orders %}
     <div class="card mb-3">
       <div class="card-header d-flex justify-content-between align-items-center">
-        <span><strong>订单 #{{ order.id }}</strong></span>
-        <span class="badge {% if order.status == 'delivered' %}bg-success{% elif order.status == 'cancelled' %}bg-danger{% elif order.status == 'pending' %}bg-warning text-dark{% else %}bg-info{% endif %}">
+        <div>
+          <strong>订单 #{{ order.id }}</strong>
+          <small class="text-muted ms-2">{{ order.created_at|date:'Y-m-d H:i' }}</small>
+        </div>
+        <span class="badge {% if order.status == 'delivered' %}bg-success{% elif order.status == 'cancelled' %}bg-danger{% elif order.status == 'pending' %}bg-warning text-dark{% elif order.status == 'paid' %}bg-info{% elif order.status == 'shipped' %}bg-primary{% else %}bg-secondary{% endif %} fs-6">
           {{ order.get_status_display }}
         </span>
       </div>
@@ -21,23 +28,44 @@
                 <div style="width:48px;height:48px;border-radius:8px;background:#e8f5e9;display:flex;align-items:center;justify-content:center;color:#2d8a4e;">
                   <i class="bi bi-basket"></i>
                 </div>
-                <div>
+                <div class="flex-grow-1">
                   <strong>{{ item.product_batch.product.name }}</strong>
                   <small class="text-muted d-block">¥{{ item.price }} × {{ item.quantity }}</small>
+                  <small class="text-muted">{{ item.product_batch.product.farmer.user.username }}</small>
                 </div>
+                {% if order.status == 'delivered' %}
+                <div>
+                  <button class="btn btn-outline-warning btn-sm review-btn"
+                          onclick="showReviewModal({{ order.id }}, {{ item.product_batch.product.id }}, '{{ item.product_batch.product.name|escapejs }}')"
+                          data-bs-toggle="modal" data-bs-target="#reviewModal">
+                    <i class="bi bi-star"></i> 评价
+                  </button>
+                </div>
+                {% endif %}
               </div>
             {% endfor %}
           </div>
           <div class="col-md-4 text-md-end">
             <div class="fw-bold text-success">合计: ¥{{ order.total_amount }}</div>
-            <small class="text-muted">{{ order.created_at|date:'Y-m-d H:i' }}</small>
+            {% if order.receiver_name or order.phone %}
+            <small class="text-muted d-block">
+              {% if order.receiver_name %}收货人：{{ order.receiver_name }}{% endif %}
+              {% if order.phone %} · {{ order.phone }}{% endif %}
+            </small>
+            {% endif %}
+            <small class="text-muted d-block">{{ order.address|truncatechars:30 }}</small>
           </div>
         </div>
         {% if order.tracking_number %}
         <div class="mt-2 pt-2 border-top small text-muted d-flex align-items-center gap-2">
           <i class="bi bi-truck"></i> <span>快递单号：<code>{{ order.tracking_number }}</code></span>
-          {% if order.status == 'shipped' %}<span class="badge bg-info">已发货</span>{% endif %}
-          {% if order.status == 'delivered' %}<span class="badge bg-success">已签收</span>{% endif %}
+        </div>
+        {% endif %}
+        {% if order.status == 'pending' %}
+        <div class="mt-2 pt-2 border-top text-end">
+          <a href="{% url 'trade:payment' order.id %}" class="btn btn-success btn-sm">
+            <i class="bi bi-wallet2"></i> 去支付
+          </a>
         </div>
         {% endif %}
       </div>
@@ -47,8 +75,114 @@
     <div class="text-center py-5 text-muted">
       <i class="bi bi-inbox" style="font-size:3rem;display:block;margin-bottom:12px;"></i>
       <p>暂无订单</p>
-      <a href="/products/" class="btn btn-success">去逛逛</a>
+      <a href="{% url 'products:list' %}" class="btn btn-success">去逛逛</a>
     </div>
   {% endif %}
 </div>
+
+<!-- 评价弹窗 -->
+<div class="modal fade" id="reviewModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">评价 <span id="reviewProductName"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="reviewOrderId">
+        <input type="hidden" id="reviewProductId">
+        <div class="mb-3">
+          <label class="form-label">评分</label>
+          <div id="reviewStars" class="d-flex gap-1" style="font-size:1.8rem;cursor:pointer;">
+            <span data-rating="1"><i class="bi bi-star"></i></span>
+            <span data-rating="2"><i class="bi bi-star"></i></span>
+            <span data-rating="3"><i class="bi bi-star"></i></span>
+            <span data-rating="4"><i class="bi bi-star"></i></span>
+            <span data-rating="5"><i class="bi bi-star"></i></span>
+          </div>
+          <input type="hidden" id="reviewRating" value="5">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">评价内容 <small class="text-muted">（选填）</small></label>
+          <textarea class="form-control" id="reviewComment" rows="3" maxlength="500" placeholder="分享一下您的购买体验…"></textarea>
+        </div>
+        <div id="reviewError" class="alert alert-danger d-none"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="button" class="btn btn-warning" id="submitReviewBtn" onclick="submitReview()">
+          <i class="bi bi-send"></i> 提交评价
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+const CSRF_TOKEN = '{{ csrf_token }}';
+
+// Star rating in modal
+document.querySelectorAll('#reviewStars span').forEach(star => {
+  star.addEventListener('click', () => {
+    const rating = parseInt(star.dataset.rating);
+    document.getElementById('reviewRating').value = rating;
+    document.querySelectorAll('#reviewStars span').forEach((s, i) => {
+      s.querySelector('i').className = i < rating ? 'bi bi-star-fill text-warning' : 'bi bi-star';
+    });
+  });
+});
+
+function showReviewModal(orderId, productId, productName) {
+  document.getElementById('reviewOrderId').value = orderId;
+  document.getElementById('reviewProductId').value = productId;
+  document.getElementById('reviewProductName').textContent = productName;
+  document.getElementById('reviewRating').value = 5;
+  document.getElementById('reviewComment').value = '';
+  document.getElementById('reviewError').classList.add('d-none');
+  // Reset stars
+  document.querySelectorAll('#reviewStars span').forEach((s, i) => {
+    s.querySelector('i').className = 'bi bi-star-fill text-warning';
+  });
+}
+
+function submitReview() {
+  const orderId = document.getElementById('reviewOrderId').value;
+  const productId = document.getElementById('reviewProductId').value;
+  const rating = document.getElementById('reviewRating').value;
+  const comment = document.getElementById('reviewComment').value;
+  const errorDiv = document.getElementById('reviewError');
+  const btn = document.getElementById('submitReviewBtn');
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> 提交中…';
+
+  fetch('/api/orders/' + orderId + '/review/', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': CSRF_TOKEN
+    },
+    body: JSON.stringify({
+      product_id: productId,
+      rating: parseInt(rating),
+      comment: comment
+    })
+  })
+    .then(async response => {
+      const data = await response.json();
+      if (!response.ok) throw data;
+      // Close modal and refresh
+      bootstrap.Modal.getInstance(document.getElementById('reviewModal')).hide();
+      location.reload();
+    })
+    .catch(error => {
+      errorDiv.textContent = error.detail || '提交失败，请稍后重试';
+      errorDiv.classList.remove('d-none');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-send"></i> 提交评价';
+    });
+}
+</script>
 {% endblock %}

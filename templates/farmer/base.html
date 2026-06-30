@@ -1,0 +1,54 @@
+{% extends 'base.html' %}
+{% block content %}
+<style>
+  .farmer-layout .farmer-sidebar-col {
+    position: sticky;
+    top: 5rem;
+    align-self: flex-start;
+  }
+  .farmer-sidebar { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+  .farmer-sidebar .sidebar-avatar {
+    width: 48px; height: 48px; border-radius: 50%; background: #e8f5e9; color: #2d8a4e;
+    display: flex; align-items: center; justify-content: center; font-size: 1.8rem;
+    margin: 0 auto 8px;
+  }
+  .farmer-sidebar .nav-link {
+    border-radius: 8px; padding: 10px 14px; color: #555;
+    font-weight: 500; transition: all 0.2s; margin-bottom: 2px;
+  }
+  .farmer-sidebar .nav-link:hover { background: #e8f5e9; color: #2d8a4e; }
+  .farmer-sidebar .nav-link.active {
+    background: #2d8a4e; color: #fff !important; font-weight: 600;
+  }
+  .farmer-sidebar .nav-link.active:hover { background: #1e6b37; color: #fff !important; }
+</style>
+<div class="container-fluid py-4 farmer-layout">
+  <div class="row">
+    <!-- 统一侧边栏 — sticky 固定 -->
+    <div class="col-md-2 mb-3 farmer-sidebar-col">
+      <div class="farmer-sidebar">
+        <div class="text-center mb-3 pb-2 border-bottom">
+          <div class="sidebar-avatar">
+            <i class="bi bi-person-circle"></i>
+          </div>
+          <h6 class="fw-bold mb-0">{{ user.username }}</h6>
+          <small class="text-muted">农户</small>
+        </div>
+        <nav class="nav flex-column">
+          <a class="nav-link {% if request.resolver_match.url_name == 'farmer_dashboard' %}active{% endif %}" href="{% url 'products:farmer_dashboard'  %}"><i class="bi bi-speedometer2 me-1"></i>工作台</a>
+          <a class="nav-link {% if '/farmer/batches' in request.path %}active{% endif %}" href="{% url 'products:farmer_batch_list'  %}"><i class="bi bi-box-seam me-1"></i>批次管理</a>
+          <a class="nav-link {% if '/farmer/products' in request.path %}active{% endif %}" href="{% url 'products:farmer_product_list'  %}"><i class="bi bi-grid me-1"></i>管理产品</a>
+          <a class="nav-link {% if '/farmer/orders' in request.path or '/farmer/order' in request.path %}active{% endif %}" href="{% url 'trade:farmer_orders'  %}"><i class="bi bi-receipt me-1"></i>订单管理</a>
+          <a class="nav-link {% if '/farmer/shop' in request.path %}active{% endif %}" href="{% url 'accounts:farmer_shop_settings'  %}"><i class="bi bi-shop me-1"></i>店铺设置</a>
+          <a class="nav-link {% if '/farmer/subsidies' in request.path %}active{% endif %}" href="{% url 'accounts:subsidy_list'  %}"><i class="bi bi-cash-coin me-1"></i>补贴申请</a>
+          <a class="nav-link {% if '/farmer/payment-methods' in request.path %}active{% endif %}" href="{% url 'accounts:farmer_payment_methods'  %}"><i class="bi bi-wallet2 me-1"></i>收款方式</a>
+        </nav>
+      </div>
+    </div>
+    <!-- 内容区 -->
+    <div class="col-md-10">
+      {% block body %}{% endblock %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,58 @@
+{% extends base_template %}
+{% block title %}创建预售活动 - 智农溯源{% endblock %}
+{% block body %}
+<div class="container py-4" style="max-width:640px;">
+  <h4 class="fw-bold mb-4"><i class="bi bi-calendar-check text-success"></i> 创建预售活动</h4>
+  <div class="card">
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label">产品名称 <span class="text-danger">*</span></label>
+          <input type="text" name="product_name" class="form-control" placeholder="例如：阳光玫瑰葡萄" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">活动描述</label>
+          <textarea name="description" class="form-control" rows="3" placeholder="描述你的产品特点、为什么值得提前预订..."></textarea>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <label class="form-label">目标数量 <span class="text-danger">*</span></label>
+            <input type="number" name="target_quantity" class="form-control" min="1" value="100" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label">单位</label>
+            <select name="unit" class="form-select">
+              <option value="kg">kg</option>
+              <option value="斤">斤</option>
+              <option value="箱">箱</option>
+              <option value="袋">袋</option>
+            </select>
+          </div>
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-6">
+            <label class="form-label">原价 (元) <span class="text-danger">*</span></label>
+            <input type="number" step="0.01" name="unit_price" class="form-control" placeholder="30.00" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label">预售价 (元) <span class="text-danger">*</span></label>
+            <input type="number" step="0.01" name="discount_price" class="form-control" placeholder="22.00" required>
+          </div>
+        </div>
+        <small class="text-muted">预售价应低于原价，让消费者感受到实惠</small>
+        <div class="mb-3 mt-3">
+          <label class="form-label">预售截止日期</label>
+          <input type="date" name="end_date" class="form-control">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">预计采收日期</label>
+          <input type="date" name="harvest_date" class="form-control">
+        </div>
+        <button type="submit" class="btn btn-success w-100"><i class="bi bi-send"></i> 创建预售</button>
+        <a href="{% url 'preorder:list'  %}" class="btn btn-outline-secondary w-100 mt-2">取消</a>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
