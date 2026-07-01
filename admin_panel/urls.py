@@ -13,4 +13,6 @@ urlpatterns = [
     path('manage/export/orders/', views.export_orders_csv, name='export_orders'),
     path('manage/export/products/', views.export_products_csv, name='export_products'),
     path('manage/applications/', views.admin_applications, name='applications'),
+    path('manage/payments/', views.admin_payments, name='payments'),
+    path('manage/payments/<int:pk>/<str:action>/', views.admin_payment_review, name='payment_review'),
 ]

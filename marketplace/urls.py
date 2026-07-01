@@ -7,4 +7,5 @@ urlpatterns = [
     path('marketplace/', views.supply_demand_list, name='list'),
     path('marketplace/create/', views.supply_demand_create, name='create'),
     path('marketplace/<int:pk>/', views.supply_demand_detail, name='detail'),
+    path('marketplace/<int:pk>/respond/', views.respond_to_demand, name='respond'),
 ]

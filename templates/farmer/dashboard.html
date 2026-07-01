@@ -99,7 +99,7 @@
           {% for p in products %}
           <tr>
             <td><strong>{{ p.name }}</strong></td>
-            <td>¥{{ p.price }}/{{ p.unit }}</td>
+            <td>¥{{ p.price }}/{{ p.unit }}{% if p.wholesale_price %} <span class="badge bg-warning text-dark small">批发</span>{% endif %}</td>
             <td>
               {% if p.status == 'approved' %}<span class="badge bg-success">已上架</span>
               {% elif p.status == 'pending' %}<span class="badge bg-warning text-dark">待审核</span>
@@ -109,9 +109,7 @@
             <td class="small text-muted">{{ p.review_note|default:'-' }}</td>
             <td class="small">{{ p.created_at|date:'m-d' }}</td>
             <td>
-              {% if p.status == 'draft' or p.status == 'rejected' %}
-                <a href="{% url 'products:farmer_product_edit' p.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
-              {% endif %}
+              <a href="{% url 'products:farmer_product_edit' p.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
               {% if p.status == 'draft' %}
                 <form method="post" action="{% url 'products:farmer_product_submit' p.pk %}" class="d-inline">
                   {% csrf_token %}

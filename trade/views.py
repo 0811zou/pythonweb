@@ -11,6 +11,7 @@ from django.utils import timezone
 from core.models import Order, OrderItem, Cart, CartItem, Favorite, Product, ProductBatch, FarmerProfile, Review
 from notifications.notify import notify, notify_farmer, notify_buyer
 from core.permissions import IsOrderParticipantOrAdmin, get_farmer_profile
+from accounts.views import farmer_required
 from trade.serializers import OrderSerializer
 from products.serializers import ReviewSerializer, ReviewDetailSerializer
 
@@ -54,23 +55,30 @@ def order_create_view(request):
     """消费者下单页面"""
     if not request.user.is_authenticated:
         return redirect(f"{reverse('accounts:login')}?next={request.path}")
-    # 农户不能给自己下单
-    try:
-        request.user.farmerprofile
-        messages.warning(request, '农户账号无法下单')
-        return redirect('products:farmer_dashboard')
-    except FarmerProfile.DoesNotExist:
-        pass
 
     product_id = request.GET.get('product') or request.POST.get('product_id')
     product = get_object_or_404(Product, pk=product_id, status='approved')
+
+    # 农户不能买自己的产品
+    try:
+        if request.user.farmerprofile and product.farmer.user_id == request.user.id:
+            messages.warning(request, '不能购买自己的产品')
+            return redirect('products:detail', pk=product.id)
+    except FarmerProfile.DoesNotExist:
+        pass
 
     if request.method == 'POST':
         try:
             quantity = int(request.POST.get('quantity', 1))
         except (TypeError, ValueError):
             return render(request, 'order_create.html', {'product': product, 'error': '数量必须为整数'})
+        receiver_name = request.POST.get('receiver_name', '').strip()
+        phone = request.POST.get('phone', '').strip()
         address = request.POST.get('address', '').strip()
+        if not receiver_name:
+            return render(request, 'order_create.html', {'product': product, 'error': '请输入收货人姓名'})
+        if not phone:
+            return render(request, 'order_create.html', {'product': product, 'error': '请输入联系电话'})
         if not address:
             return render(request, 'order_create.html', {'product': product, 'error': '请填写收货地址'})
         if quantity <= 0:
@@ -87,25 +95,25 @@ def order_create_view(request):
                 if not batch:
                     return render(request, 'order_create.html', {'product': product, 'error': '库存不足'})
                 total = product.price * Decimal(quantity)
+                unit_price = product.price
+                # 批发价判断：满足起订量时使用批发价
+                if product.wholesale_price and quantity >= product.wholesale_min_quantity:
+                    unit_price = product.wholesale_price
+                    total = unit_price * Decimal(quantity)
                 order = Order.objects.create(
                     buyer=request.user,
                     total_amount=total,
-                    status='pending',
+                    receiver_name=receiver_name,
+                    phone=phone,
                     address=address,
+                    status='pending',
                 )
-                OrderItem.objects.create(order=order, product_batch=batch, quantity=quantity, price=product.price)
+                OrderItem.objects.create(order=order, product_batch=batch, quantity=quantity, price=unit_price)
                 batch.quantity -= quantity
                 batch.save(update_fields=['quantity'])
-                # 通知农户
-                farmer_user = product.farmer.user
-                notify(farmer_user, 'order',
-                    f'新订单 #{order.id}',
-                    f'消费者 {request.user.username} 购买了 {product.name} x{quantity}，总价 ¥{total}',
-                    reverse('trade:farmer_orders'))
         except (InvalidOperation, ValueError):
             return render(request, 'order_create.html', {'product': product, 'error': '订单金额计算失败'})
-        messages.success(request, f'下单成功！订单编号 #{order.id}')
-        return redirect('products:detail', pk=product.id)
+        return redirect('trade:payment', order_id=order.id)
 
     return render(request, 'order_create.html', {'product': product})
 
@@ -125,8 +133,10 @@ def order_review_api(request, order_id):
         return Response({'detail': '请先登录'}, status=status.HTTP_401_UNAUTHORIZED)
 
     order = get_object_or_404(Order, pk=order_id, buyer=request.user)
-    if order.status != 'delivered':
-        return Response({'detail': '只有已完成的订单才能评价'}, status=status.HTTP_403_FORBIDDEN)
+    # 付款确认后（paid 及以上状态）即可评价
+    reviewable_statuses = ['paid', 'shipped', 'delivered']
+    if order.status not in reviewable_statuses:
+        return Response({'detail': '只有付款已确认的订单才能评价'}, status=status.HTTP_403_FORBIDDEN)
 
     product_id = request.data.get('product_id')
     if not product_id:
@@ -156,31 +166,20 @@ def order_review_api(request, order_id):
 
 # ===== 农户端订单与物流 =====
 
+@farmer_required
 def farmer_orders_view(request):
     """农户查看自己产品的订单"""
-    if not request.user.is_authenticated:
-        from django.shortcuts import redirect as rd
-        return rd('login')
-    try:
-        profile = request.user.farmerprofile
-    except FarmerProfile.DoesNotExist:
-        messages.error(request, '请先注册为农户')
-        return redirect('accounts:register')
+    profile = request.farmer_profile
     orders = Order.objects.filter(
         items__product_batch__product__farmer=profile
     ).prefetch_related('items__product_batch__product', 'buyer').distinct().order_by('-created_at')
     return render(request, 'farmer/orders.html', {'orders': orders})
 
 
+@farmer_required
 def farmer_set_tracking(request, order_id):
     """农户填写快递单号"""
-    if not request.user.is_authenticated:
-        return redirect('accounts:login')
-    try:
-        profile = request.user.farmerprofile
-    except FarmerProfile.DoesNotExist:
-        messages.error(request, '请先注册为农户')
-        return redirect('accounts:register')
+    profile = request.farmer_profile
     order = get_object_or_404(Order, pk=order_id, items__product_batch__product__farmer=profile)
     if request.method == 'POST':
         tracking = request.POST.get('tracking_number', '').strip()
@@ -255,8 +254,13 @@ def cart_checkout(request):
         messages.warning(request, '购物车为空')
         return redirect('trade:cart_view')
 
-    # 计算选中商品的金额
-    checkout_total = sum(item.product.price * item.quantity for item in items)
+    # 计算选中商品的金额（含批发价逻辑）
+    def effective_price(pr, qty):
+        if pr.wholesale_price and qty >= pr.wholesale_min_quantity:
+            return pr.wholesale_price
+        return pr.price
+
+    checkout_total = sum(effective_price(item.product, item.quantity) * item.quantity for item in items)
 
     if request.method == 'POST':
         receiver_name = request.POST.get('receiver_name', '').strip()
@@ -279,15 +283,28 @@ def cart_checkout(request):
             })
         try:
             with transaction.atomic():
-                total = sum(item.product.price * item.quantity for item in items)
+                total = Decimal('0')
+                for item in items:
+                    total += effective_price(item.product, item.quantity) * item.quantity
                 order = Order.objects.create(
                     buyer=request.user, total_amount=total,
                     receiver_name=receiver_name, phone=phone, address=address,
                     status='pending'
                 )
                 for item in items:
-                    batch = ProductBatch.objects.filter(product=item.product, status='approved').first()
-                    OrderItem.objects.create(order=order, product_batch=batch, quantity=item.quantity, price=item.product.price)
+                    batch = (
+                        ProductBatch.objects
+                        .select_for_update()
+                        .filter(product=item.product, status='approved', quantity__gte=item.quantity)
+                        .order_by('harvest_date', 'created_at')
+                        .first()
+                    )
+                    if not batch:
+                        raise ValueError(f'「{item.product.name}」库存不足，请返回购物车调整数量')
+                    up = effective_price(item.product, item.quantity)
+                    OrderItem.objects.create(order=order, product_batch=batch, quantity=item.quantity, price=up)
+                    batch.quantity -= item.quantity
+                    batch.save(update_fields=['quantity'])
                 # 只删除已结算的商品（保留未选中的）
                 CartItem.objects.filter(id__in=[it.id for it in items]).delete()
                 return redirect('trade:payment', order_id=order.id)
@@ -323,23 +340,38 @@ def payment_view(request, order_id):
             farmer_methods[fid] = methods
 
     if request.method == 'POST':
-        payment_method = request.POST.get('payment_method', '模拟支付').strip()
+        payment_method = request.POST.get('payment_method', '').strip()
+        payment_proof = request.FILES.get('payment_proof')
+        if not payment_method:
+            messages.error(request, '请选择付款方式')
+            return render(request, 'trade/payment.html', {'order': order, 'farmer_methods': farmer_methods})
+        if not payment_proof:
+            messages.error(request, '请上传付款凭证截图')
+            return render(request, 'trade/payment.html', {'order': order, 'farmer_methods': farmer_methods})
+        # 保存上传的凭证图片
+        from django.core.files.storage import default_storage
+        from django.core.files.base import ContentFile
+        import os
+        ext = os.path.splitext(payment_proof.name)[1] or '.jpg'
+        save_name = f'payment_proofs/order_{order.id}_{request.user.id}{ext}'
+        saved_path = default_storage.save(save_name, ContentFile(payment_proof.read()))
         with transaction.atomic():
-            order.status = 'paid'
+            order.status = 'paid_offline'
             order.payment_method = payment_method
-            order.save(update_fields=['status', 'payment_method', 'updated_at'])
-            # 通知农户
+            order.payment_proof = saved_path
+            order.save(update_fields=['status', 'payment_method', 'payment_proof', 'updated_at'])
+            # 通知农户：用户已付款，等待平台确认
             for item in order.items.all():
                 if item.product_batch and item.product_batch.product.farmer:
                     try:
                         notify(item.product_batch.product.farmer.user, 'order',
-                            f'新订单 #{order.id} 已支付',
-                            f'消费者 {request.user.username} 购买了 {item.product_batch.product.name} x{item.quantity}，已支付 ¥{order.total_amount}',
+                            f'订单 #{order.id} 用户已提交付款凭证',
+                            f'消费者 {request.user.username} 已为 {item.product_batch.product.name} 付款 ¥{order.total_amount}，等待平台审核确认。',
                             reverse('trade:farmer_orders'))
                     except Exception:
                         pass
-            messages.success(request, f'支付成功！订单 #{order.id} 已提交，等待农户确认发货。')
-            return redirect('trade:consumer_orders')
+        messages.success(request, f'付款凭证已提交！订单 #{order.id} 等待管理员审核确认。')
+        return redirect('trade:consumer_orders')
 
     return render(request, 'trade/payment.html', {
         'order': order,
@@ -366,15 +398,29 @@ def cart_batch_checkout(request):
             return redirect('trade:cart_view')
         try:
             with transaction.atomic():
-                total = sum(item.product.price * item.quantity for item in items)
+                total = Decimal('0')
+                for item in items:
+                    up = item.product.wholesale_price if (item.product.wholesale_price and item.quantity >= item.product.wholesale_min_quantity) else item.product.price
+                    total += up * item.quantity
                 order = Order.objects.create(buyer=request.user, total_amount=total, address=address, status='confirmed')
                 for item in items:
-                    batch = ProductBatch.objects.filter(product=item.product, status='approved').first()
-                    OrderItem.objects.create(order=order, product_batch=batch, quantity=item.quantity, price=item.product.price)
+                    batch = (
+                        ProductBatch.objects
+                        .select_for_update()
+                        .filter(product=item.product, status='approved', quantity__gte=item.quantity)
+                        .order_by('harvest_date', 'created_at')
+                        .first()
+                    )
+                    if not batch:
+                        raise ValueError(f'「{item.product.name}」库存不足，请返回购物车调整数量')
+                    up = item.product.wholesale_price if (item.product.wholesale_price and item.quantity >= item.product.wholesale_min_quantity) else item.product.price
+                    OrderItem.objects.create(order=order, product_batch=batch, quantity=item.quantity, price=up)
+                    batch.quantity -= item.quantity
+                    batch.save(update_fields=['quantity'])
                     # 通知农户
                     notify(item.product.farmer.user, 'order',
                         f'新订单 #{order.id}',
-                        f'消费者 {request.user.username} 购买了 {item.product.name} x{item.quantity}，总价 ¥{item.product.price * item.quantity}',
+                        f'消费者 {request.user.username} 购买了 {item.product.name} x{item.quantity}，总价 ¥{up * item.quantity}',
                         reverse('trade:farmer_orders'))
                 items.delete()
                 messages.success(request, f'下单成功！订单编号 #{order.id}')

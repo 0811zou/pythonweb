@@ -12,20 +12,49 @@
       </div>
       <div class="row mb-3">
         <div class="col-md-4">
-          <label class="form-label">分类</label>
-          <input type="text" name="category" class="form-control" value="{{ product.category|default:'' }}" placeholder="如果蔬、粮油">
+          <label class="form-label">分类 <small class="text-muted">(选填)</small></label>
+          <input type="text" name="category" class="form-control" value="{{ product.category|default:'' }}"
+                 list="category-list" placeholder="选择或自行输入" autocomplete="off">
+          <datalist id="category-list">
+            {% for c in categories %}<option value="{{ c }}">
+            {% endfor %}
+          </datalist>
         </div>
         <div class="col-md-4">
-          <label class="form-label">品种</label>
-          <input type="text" name="variety" class="form-control" value="{{ product.variety|default:'' }}">
+          <label class="form-label">品种 <small class="text-muted">(选填)</small></label>
+          <input type="text" name="variety" class="form-control" value="{{ product.variety|default:'' }}"
+                 list="variety-list" placeholder="选择或自行输入" autocomplete="off">
+          <datalist id="variety-list">
+            {% for v in varieties %}<option value="{{ v }}">
+            {% endfor %}
+          </datalist>
         </div>
         <div class="col-md-4">
-          <label class="form-label">价格 <span class="text-danger">*</span></label>
+          <label class="form-label">零售单价 <span class="text-danger">*</span></label>
           <div class="input-group">
             <span class="input-group-text">¥</span>
             <input type="number" step="0.01" name="price" class="form-control" value="{{ product.price|default:'' }}" required>
             <input type="text" name="unit" class="form-control" value="{{ product.unit|default:'kg' }}" style="max-width:70px;">
           </div>
+          <div class="form-text small">面向普通消费者的零售价格</div>
+        </div>
+      </div>
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <label class="form-label">批发单价 <small class="text-muted">(选填)</small></label>
+          <div class="input-group">
+            <span class="input-group-text">¥</span>
+            <input type="number" step="0.01" name="wholesale_price" class="form-control" value="{{ product.wholesale_price|default:'' }}" placeholder="低于零售价">
+          </div>
+          <div class="form-text small">面向批发商的价格，留空则不支持批发</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">批发起订量 <small class="text-muted">(选填)</small></label>
+          <div class="input-group">
+            <input type="number" step="1" min="1" name="wholesale_min_quantity" class="form-control" value="{{ product.wholesale_min_quantity|default:'10' }}">
+            <span class="input-group-text">{{ product.unit|default:'kg' }}</span>
+          </div>
+          <div class="form-text small">达到此数量自动启用批发价</div>
         </div>
       </div>
       <div class="mb-3">

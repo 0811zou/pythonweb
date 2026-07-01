@@ -1,0 +1,61 @@
+{% extends base_template %}
+{% block title %}响应需求 - {{ post.product_name }} - 智农溯源{% endblock %}
+{% block body %}
+<div class="container py-4" style="max-width:640px;">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb">
+      <li class="breadcrumb-item"><a href="/">首页</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'marketplace:list' %}">供需对接</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'marketplace:detail' post.pk %}">{{ post.product_name }}</a></li>
+      <li class="breadcrumb-item active">响应需求</li>
+    </ol>
+  </nav>
+
+  <h4 class="fw-bold mb-2"><i class="bi bi-reply-fill text-primary"></i> 我有货源</h4>
+  <p class="text-muted mb-4">
+    买家 <strong>{{ post.author.username }}</strong> 需要 <strong>{{ post.product_name }}</strong>（{{ post.quantity }}{{ post.unit }}）· {{ post.region }}
+  </p>
+
+  {% if farmer_products %}
+  <div class="card">
+    <div class="card-body">
+      <form method="post">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label fw-bold">选择你的产品 <span class="text-danger">*</span></label>
+          {% for fp in farmer_products %}
+          <div class="form-check border rounded p-3 mb-2">
+            <input class="form-check-input" type="radio" name="product_id" value="{{ fp.id }}" id="prod_{{ fp.id }}"
+                   {% if forloop.first %}checked{% endif %}>
+            <label class="form-check-label w-100" for="prod_{{ fp.id }}">
+              <strong>{{ fp.name }}</strong>
+              <span class="text-success ms-2">¥{{ fp.price }}/{{ fp.unit|default:'kg' }}</span>
+              {% if fp.wholesale_price %}
+              <span class="badge bg-warning text-dark ms-1 small">批发 ¥{{ fp.wholesale_price }}</span>
+              {% endif %}
+              <br><small class="text-muted">{{ fp.description|truncatechars:80|default:'暂无描述' }}</small>
+            </label>
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-bold">给买家的留言</label>
+          <textarea name="message" class="form-control" rows="3"
+                    placeholder="介绍一下你的产品优势、供货能力、价格优惠等...（选填）"></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100"><i class="bi bi-send"></i> 发送响应</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <div class="alert alert-warning">
+    <i class="bi bi-exclamation-triangle"></i>
+    <strong>暂无匹配产品</strong><br>
+    <span class="small">你还没有「{{ post.category }}」品类的已上架产品。请先在<a href="{% url 'products:farmer_product_create' %}">产品管理</a>中发布同品类产品。</span>
+  </div>
+  <a href="{% url 'marketplace:detail' post.pk %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> 返回需求详情</a>
+  {% endif %}
+</div>
+{% endblock %}

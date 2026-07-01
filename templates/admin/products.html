@@ -13,14 +13,28 @@
   <div class="card-body p-0">
     <div class="table-responsive">
       <table class="table table-hover mb-0">
-        <thead><tr><th>产品</th><th>农户</th><th>价格</th><th>分类</th><th>状态</th><th>提交时间</th><th>操作</th></tr></thead>
+        <thead><tr><th style="width:40px;"></th><th style="width:60px;">图片</th><th>产品</th><th>农户</th><th>价格</th><th>分类</th><th>状态</th><th>提交时间</th><th>操作</th></tr></thead>
         <tbody>
           {% for p in products %}
           <tr>
+            <td>
+              <button class="btn btn-sm btn-outline-secondary toggle-detail" data-target="detail-{{ p.pk }}" title="查看详情">
+                <i class="bi bi-chevron-down"></i>
+              </button>
+            </td>
+            <td>
+              {% if p.image %}
+                <img src="{{ p.image.url }}" class="rounded" style="width:48px;height:48px;object-fit:cover;">
+              {% else %}
+                <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width:48px;height:48px;">
+                  <i class="bi bi-image text-muted small"></i>
+                </div>
+              {% endif %}
+            </td>
             <td><strong>{{ p.name }}</strong></td>
             <td><small>{{ p.farmer.user.username }}</small></td>
-            <td>¥{{ p.price }}</td>
-            <td><small>{{ p.category|default:'-' }}</small></td>
+            <td>¥{{ p.price }}/{{ p.unit|default:'kg' }}{% if p.wholesale_price %} <span class="text-warning small">批 ¥{{ p.wholesale_price }}</span>{% endif %}</td>
+            <td><small>{{ p.category|default:'-' }}{% if p.variety %} · {{ p.variety }}{% endif %}</small></td>
             <td>
               {% if p.status == 'approved' %}<span class="badge bg-success">已上架</span>
               {% elif p.status == 'pending' %}<span class="badge bg-warning text-dark">待审核</span>
@@ -34,22 +48,89 @@
                   {% csrf_token %}
                   <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i> 通过</button>
                 </form>
-                <form method="post" action="{% url 'admin_panel:product_review' p.pk 'reject' %}" class="d-inline-flex gap-1 mt-1 mt-lg-0">
-                  {% csrf_token %}
-                  <input type="text" name="note" class="form-control form-control-sm" placeholder="拒绝原因" style="max-width:160px;" required>
-                  <button type="submit" class="btn btn-sm btn-danger"><i class="bi bi-x-lg"></i> 拒绝</button>
-                </form>
+                <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ p.pk }}"><i class="bi bi-x-lg"></i> 拒绝</button>
               {% else %}
                 <span class="text-muted small">{{ p.review_note|default:'-' }}</span>
               {% endif %}
             </td>
           </tr>
+          {# ── 展开详情行 ── #}
+          <tr id="detail-{{ p.pk }}" class="product-detail-row" style="display:none;">
+            <td colspan="9" class="bg-light">
+              <div class="row p-3">
+                <div class="col-md-3 text-center">
+                  {% if p.image %}
+                    <img src="{{ p.image.url }}" class="img-thumbnail" style="max-height:180px;">
+                  {% else %}
+                    <div class="bg-secondary bg-opacity-10 rounded d-flex align-items-center justify-content-center" style="height:120px;">
+                      <i class="bi bi-image text-muted" style="font-size:2rem;"></i>
+                    </div>
+                  {% endif %}
+                </div>
+                <div class="col-md-9">
+                  <table class="table table-sm mb-0">
+                    <tr><td style="width:80px;"><strong>名称</strong></td><td>{{ p.name }}</td></tr>
+                    <tr><td><strong>分类</strong></td><td>{{ p.category|default:'未填写' }}</td></tr>
+                    <tr><td><strong>品种</strong></td><td>{{ p.variety|default:'未填写' }}</td></tr>
+                    <tr><td><strong>零售价</strong></td><td>¥{{ p.price }} / {{ p.unit|default:'kg' }}</td></tr>
+                    {% if p.wholesale_price %}
+                    <tr><td><strong>批发价</strong></td><td>¥{{ p.wholesale_price }} / {{ p.unit|default:'kg' }}（满 {{ p.wholesale_min_quantity }} 起批）</td></tr>
+                    {% endif %}
+                    <tr><td><strong>描述</strong></td><td>{{ p.description|default:'未填写'|linebreaksbr }}</td></tr>
+                    <tr><td><strong>农户</strong></td><td>{{ p.farmer.user.username }} ({{ p.farmer.farm_name|default:'未设置店铺名' }})</td></tr>
+                    <tr><td><strong>提交时间</strong></td><td>{{ p.created_at|date:'Y-m-d H:i:s' }}</td></tr>
+                  </table>
+                </div>
+              </div>
+            </td>
+          </tr>
           {% empty %}
-          <tr><td colspan="7" class="text-center py-4 text-muted">暂无产品</td></tr>
+          <tr><td colspan="9" class="text-center py-4 text-muted">暂无产品</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
 </div>
+
+{# ── 拒绝模态框统一放在表格外面 ── #}
+{% for p in products %}
+{% if p.status == 'pending' %}
+<div class="modal fade" id="rejectModal{{ p.pk }}" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="post" action="{% url 'admin_panel:product_review' p.pk 'reject' %}" class="modal-content">
+      {% csrf_token %}
+      <div class="modal-header">
+        <h5 class="modal-title">拒绝「{{ p.name }}」</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">拒绝原因</label>
+        <textarea name="note" class="form-control" rows="3" placeholder="填写拒绝原因..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-danger">确认拒绝</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+
+<script>
+document.querySelectorAll('.toggle-detail').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const target = document.getElementById(this.dataset.target);
+    const icon = this.querySelector('i');
+    if (target.style.display === 'none') {
+      target.style.display = '';
+      icon.className = 'bi bi-chevron-up';
+    } else {
+      target.style.display = 'none';
+      icon.className = 'bi bi-chevron-down';
+    }
+  });
+});
+</script>
 {% endblock %}

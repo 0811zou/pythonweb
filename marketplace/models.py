@@ -32,3 +32,21 @@ class SupplyDemandPost(models.Model):
 
     def __str__(self):
         return f"[{'供' if self.post_type == 'supply' else '需'}] {self.product_name} ({self.author.username})"
+
+
+class DemandResponse(models.Model):
+    """农户对需求帖的响应 — 主动提供自己的产品给买家"""
+    farmer = models.ForeignKey('accounts.FarmerProfile', on_delete=models.CASCADE, related_name='demand_responses')
+    demand_post = models.ForeignKey(SupplyDemandPost, on_delete=models.CASCADE, related_name='responses')
+    product = models.ForeignKey('products.Product', on_delete=models.CASCADE, related_name='demand_responses')
+    message = models.TextField(blank=True, verbose_name='留言', help_text='向买家介绍你的产品优势')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'core_demandresponse'
+        ordering = ['-created_at']
+        verbose_name = '需求响应'
+        verbose_name_plural = '需求响应'
+
+    def __str__(self):
+        return f'{self.farmer.user.username} → {self.demand_post.product_name}: {self.product.name}'

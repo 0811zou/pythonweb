@@ -6,41 +6,81 @@
     <div class="text-center mb-4">
       <span style="font-size:2.5rem;">🤝</span>
       <h2 class="section-title mt-2">申请入驻平台</h2>
-      <p class="section-subtitle">农户可申请入驻，审核通过后即可上架产品、使用平台服务</p>
+      <p class="section-subtitle">填写信息并上传证件材料，审核通过后即可上架产品</p>
     </div>
+
+    {% if rejected_app %}
+    <div class="alert alert-warning d-flex align-items-start gap-2 mb-3">
+      <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+      <div>
+        <strong>上一次申请未通过</strong>
+        {% if rejected_app.reviewer_note %}
+        <br><span class="small">审核意见：{{ rejected_app.reviewer_note }}</span>
+        {% endif %}
+        <br><span class="small">请根据意见修改后重新提交。</span>
+      </div>
+    </div>
+    {% endif %}
 
     <div class="card">
       <div class="card-body p-4">
-        <form method="POST">
+        <form method="POST" enctype="multipart/form-data">
           {% csrf_token %}
           <input type="hidden" name="apply_type" value="farmer">
 
           <div class="mb-3">
-            <label class="form-label fw-bold">姓名</label>
+            <label class="form-label fw-bold">姓名/店铺名称 <span class="text-danger">*</span></label>
             <input type="text" name="name" class="form-control" required
-                   placeholder="如：张三" value="{{ prefill.name|default:'' }}">
+                   placeholder="如：张三 或 XX农场" value="{{ prefill.name|default:'' }}">
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-bold">联系电话 <span class="text-danger">*</span></label>
+              <input type="tel" name="phone" class="form-control" required
+                     placeholder="如：13800138000" value="{{ prefill.phone|default:'' }}">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold">所在地区 <span class="text-danger">*</span></label>
+              <input type="text" name="region" class="form-control" required
+                     placeholder="如：山东省寿光市" value="{{ prefill.region|default:'' }}">
+            </div>
           </div>
 
           <div class="mb-3">
-            <label class="form-label fw-bold">联系电话</label>
-            <input type="tel" name="phone" class="form-control" required
-                   placeholder="如：13800138000" value="{{ prefill.phone|default:'' }}">
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label fw-bold">所在地区</label>
-            <input type="text" name="region" class="form-control" required
-                   placeholder="如：山东省寿光市" value="{{ prefill.region|default:'' }}">
-          </div>
-
-          <div class="mb-3">
-            <label class="form-label fw-bold">简介（可选）</label>
+            <label class="form-label fw-bold">简介</label>
             <textarea name="description" class="form-control" rows="3"
                       placeholder="介绍一下您的产品种类、种植规模或特色…">{{ prefill.description|default:'' }}</textarea>
           </div>
 
+          <hr>
+          <h6 class="fw-bold mb-3"><i class="bi bi-paperclip"></i> 证件材料（请上传清晰照片）</h6>
+
+          <div class="row mb-3">
+            <div class="col-md-6">
+              <label class="form-label">身份证/户口本 <span class="text-danger">*</span></label>
+              <input type="file" name="id_document" class="form-control" accept="image/*" required>
+              <div class="form-text small">请上传清晰的身份证明文件照片</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">营业执照/资质证明</label>
+              <input type="file" name="license_document" class="form-control" accept="image/*">
+              <div class="form-text small">如有营业执照或经营资质请上传</div>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">农场/产品照片</label>
+            <input type="file" name="farm_photo1" class="form-control" accept="image/*">
+            <div class="form-text small">上传农场或产品照片，有助于审核通过</div>
+          </div>
+
+          <div class="alert alert-info small mb-3">
+            <i class="bi bi-shield-check"></i> <strong>审核说明：</strong> 提交后管理员会审核您的身份和资质，审核通过后即可使用农户全部功能。审核不通过可重新提交。
+          </div>
+
           <button type="submit" class="btn btn-success w-100 py-2">
-            <i class="bi bi-send"></i> 提交申请
+            <i class="bi bi-send"></i> 提交入驻申请
           </button>
         </form>
       </div>

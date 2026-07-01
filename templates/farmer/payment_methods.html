@@ -76,7 +76,7 @@
 <div class="modal fade" id="addMethodModal" tabindex="-1">
   <div class="modal-dialog">
     <div class="modal-content">
-      <form method="post">
+      <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
         <input type="hidden" name="action" value="add">
         <div class="modal-header">
@@ -100,6 +100,11 @@
             <label class="form-label">账号 <span class="text-danger">*</span></label>
             <input type="text" name="account_number" class="form-control" required
                    placeholder="微信号/支付宝账号/银行卡号">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">收款二维码 <small class="text-muted">(推荐上传)</small></label>
+            <input type="file" name="qr_code" class="form-control" accept="image/*">
+            <div class="form-text">上传微信/支付宝的收款二维码，方便消费者直接扫码付款</div>
           </div>
         </div>
         <div class="modal-footer">

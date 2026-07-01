@@ -18,6 +18,7 @@ urlpatterns = [
     path('farmer/batches/', views.farmer_batch_list, name='farmer_batch_list'),
     path('farmer/batches/create/', views.farmer_batch_create, name='farmer_batch_create'),
     path('farmer/batches/<int:pk>/', views.farmer_batch_detail, name='farmer_batch_detail'),
+    path('farmer/batches/<int:pk>/delete/', views.farmer_batch_delete, name='farmer_batch_delete'),
     path('farmer/batches/<int:pk>/qr/', views.download_qr, name='download_qr'),
     # API (must be before router in config/urls.py)
     path('api/products/<int:pk>/reviews/', views.product_reviews, name='product_reviews'),

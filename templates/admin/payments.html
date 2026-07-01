@@ -1,0 +1,168 @@
+{% extends 'admin/panel_base.html' %}
+{% block title %}支付审核 - 管理后台{% endblock %}
+{% block body %}
+<h4 class="fw-bold mb-1"><i class="bi bi-credit-card text-danger"></i> 付款凭证审核</h4>
+<p class="text-muted mb-3">审核用户上传的付款凭证，确认到账后通知农户发货</p>
+
+<div class="d-flex gap-2 mb-3">
+  <a href="?status=paid_offline" class="btn btn-sm {% if current_status == 'paid_offline' %}btn-warning{% else %}btn-outline-warning{% endif %}">待审核</a>
+  <a href="?status=paid" class="btn btn-sm {% if current_status == 'paid' %}btn-success{% else %}btn-outline-success{% endif %}">已确认</a>
+  <a href="?status=all" class="btn btn-sm {% if current_status == 'all' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">全部</a>
+</div>
+
+{% if orders %}
+<div class="table-responsive">
+  <table class="table table-hover">
+    <thead>
+      <tr>
+        <th style="width:36px;"></th>
+        <th>订单号</th>
+        <th>买家</th>
+        <th>商品</th>
+        <th>金额</th>
+        <th>付款方式</th>
+        <th>凭证</th>
+        <th>提交时间</th>
+        <th>状态</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for o in orders %}
+      <tr>
+        <td>
+          <button class="btn btn-sm btn-outline-secondary toggle-payment-detail" data-target="payment-detail-{{ o.id }}" style="padding:0 4px;font-size:11px;">
+            <i class="bi bi-chevron-down"></i>
+          </button>
+        </td>
+        <td><strong>#{{ o.id }}</strong></td>
+        <td>{{ o.buyer.username }}<br><small class="text-muted">{{ o.phone }}</small></td>
+        <td>
+          {% for item in o.items.all %}
+            <small>{{ item.product_batch.product.name }} x{{ item.quantity }}</small><br>
+          {% endfor %}
+        </td>
+        <td><strong class="text-danger">¥{{ o.total_amount }}</strong></td>
+        <td>{{ o.payment_method|default:'-' }}</td>
+        <td>
+          {% if o.payment_proof %}
+            <span class="badge bg-success">已上传</span>
+          {% else %}
+            <span class="badge bg-secondary">无</span>
+          {% endif %}
+        </td>
+        <td><small>{{ o.created_at|date:'m-d H:i' }}</small></td>
+        <td>
+          <span class="badge {% if o.status == 'paid_offline' %}bg-warning text-dark{% elif o.status == 'paid' %}bg-success{% else %}bg-secondary{% endif %}">
+            {% if o.status == 'paid_offline' %}待审核{% elif o.status == 'paid' %}已确认{% else %}{{ o.get_status_display }}{% endif %}
+          </span>
+        </td>
+        <td>
+          {% if o.status == 'paid_offline' %}
+          <button class="btn btn-sm btn-success" onclick="confirmPayment({{ o.id }})"><i class="bi bi-check-lg"></i> 确认收款</button>
+          <button class="btn btn-sm btn-danger" onclick="rejectPayment({{ o.id }})"><i class="bi bi-x-lg"></i> 退回</button>
+          {% endif %}
+        </td>
+      </tr>
+      {# ── 展开详情行 ── #}
+      <tr id="payment-detail-{{ o.id }}" class="payment-detail-row" style="display:none;">
+        <td colspan="10" class="bg-light">
+          <div class="row p-3">
+            <div class="col-md-6">
+              <h6 class="fw-bold mb-2"><i class="bi bi-receipt"></i> 订单详情</h6>
+              <table class="table table-sm mb-0">
+                <tr><td style="width:100px;"><strong>订单号</strong></td><td>#{{ o.id }}</td></tr>
+                <tr><td><strong>买家</strong></td><td>{{ o.buyer.username }} ({{ o.buyer.email|default:'无邮箱' }})</td></tr>
+                <tr><td><strong>收货人</strong></td><td>{{ o.receiver_name }}</td></tr>
+                <tr><td><strong>电话</strong></td><td>{{ o.phone }}</td></tr>
+                <tr><td><strong>地址</strong></td><td>{{ o.address }}</td></tr>
+                <tr><td><strong>总金额</strong></td><td><strong class="text-danger">¥{{ o.total_amount }}</strong></td></tr>
+                <tr><td><strong>付款方式</strong></td><td>{{ o.payment_method|default:'未选择' }}</td></tr>
+                <tr><td><strong>提交时间</strong></td><td>{{ o.created_at|date:'Y-m-d H:i:s' }}</td></tr>
+                {% if o.tracking_number %}
+                <tr><td><strong>快递单号</strong></td><td>{{ o.tracking_number }}</td></tr>
+                {% endif %}
+              </table>
+            </div>
+            <div class="col-md-6">
+              <h6 class="fw-bold mb-2"><i class="bi bi-image"></i> 付款凭证</h6>
+              {% if o.payment_proof %}
+                <a href="/media/{{ o.payment_proof }}" target="_blank">
+                  <img src="/media/{{ o.payment_proof }}" class="img-fluid rounded border" style="max-height:300px;cursor:pointer;">
+                </a>
+                <p class="small text-muted mt-1">点击图片查看大图</p>
+              {% else %}
+                <div class="text-muted py-4 text-center"><i class="bi bi-file-x" style="font-size:2rem;"></i><br>未上传凭证</div>
+              {% endif %}
+            </div>
+          </div>
+          {# 商品明细 #}
+          <div class="mt-2">
+            <h6 class="fw-bold mb-2"><i class="bi bi-basket"></i> 商品明细</h6>
+            <table class="table table-sm table-bordered mb-0">
+              <thead class="table-light"><tr><th>商品</th><th>农户</th><th>单价</th><th>数量</th><th>小计</th></tr></thead>
+              <tbody>
+                {% for item in o.items.all %}
+                <tr>
+                  <td>{{ item.product_batch.product.name }}</td>
+                  <td>{{ item.product_batch.product.farmer.user.username }}</td>
+                  <td>¥{{ item.price }}</td>
+                  <td>{{ item.quantity }}</td>
+                  <td>¥{{ item.price|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-inbox" style="font-size:3rem;display:block;margin-bottom:12px;"></i>
+  <p>暂无待审核的付款凭证</p>
+</div>
+{% endif %}
+
+{# ── 操作表单 ── #}
+<form id="paymentActionForm" method="POST" style="display:none;">
+  {% csrf_token %}
+  <input type="hidden" name="note" id="paymentActionNote">
+</form>
+
+<script>
+// 展开详情
+document.querySelectorAll('.toggle-payment-detail').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const target = document.getElementById(this.dataset.target);
+    const icon = this.querySelector('i');
+    if (target.style.display === 'none') {
+      target.style.display = '';
+      icon.className = 'bi bi-chevron-up';
+    } else {
+      target.style.display = 'none';
+      icon.className = 'bi bi-chevron-down';
+    }
+  });
+});
+
+function confirmPayment(pk) {
+  if (!confirm('确认该订单已收款？确认后将通知农户发货。')) return;
+  const form = document.getElementById('paymentActionForm');
+  form.action = '/manage/payments/' + pk + '/confirm/';
+  form.submit();
+}
+
+function rejectPayment(pk) {
+  const note = prompt('请输入退回原因（必填）：');
+  if (!note || !note.trim()) { alert('必须填写退回原因'); return; }
+  const form = document.getElementById('paymentActionForm');
+  document.getElementById('paymentActionNote').value = note;
+  form.action = '/manage/payments/' + pk + '/reject/';
+  form.submit();
+}
+</script>
+{% endblock %}

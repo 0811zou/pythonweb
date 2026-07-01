@@ -47,6 +47,8 @@ class OrderSerializer(serializers.ModelSerializer):
                 if batch.quantity < quantity:
                     raise serializers.ValidationError(f'{batch.product.name} 库存不足')
                 price = batch.product.price
+                if batch.product.wholesale_price and quantity >= batch.product.wholesale_min_quantity:
+                    price = batch.product.wholesale_price
                 OrderItem.objects.create(order=order, product_batch=batch, quantity=quantity, price=price)
                 batch.quantity -= quantity
                 batch.save(update_fields=['quantity'])

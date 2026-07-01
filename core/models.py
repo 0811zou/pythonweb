@@ -59,11 +59,18 @@ class JoinApplication(models.Model):
         ('approved', '已通过'),
         ('rejected', '已拒绝'),
     ]
+    user = models.ForeignKey(
+        'auth.User', null=True, blank=True, on_delete=models.CASCADE, related_name='join_applications',
+        verbose_name='申请人'
+    )
     apply_type = models.CharField(max_length=20, choices=APPLY_TYPE_CHOICES, verbose_name='申请类型')
     name = models.CharField(max_length=200, verbose_name='姓名/合作社名称')
     phone = models.CharField(max_length=20, verbose_name='联系电话')
     region = models.CharField(max_length=200, verbose_name='所在地区')
     description = models.TextField(blank=True, verbose_name='简介（产品/规模/特色）')
+    id_document = models.ImageField(upload_to='applications/id_docs/', blank=True, null=True, verbose_name='身份证/户口本')
+    license_document = models.ImageField(upload_to='applications/licenses/', blank=True, null=True, verbose_name='营业执照/资质证明')
+    farm_photos = models.JSONField(default=list, blank=True, verbose_name='农场/产品照片')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', verbose_name='审核状态')
     reviewer_note = models.TextField(blank=True, verbose_name='审核备注')
     reviewed_by = models.ForeignKey(

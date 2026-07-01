@@ -16,10 +16,12 @@ class Command(BaseCommand):
     help = '填充演示数据（不会删除用户账号）'
 
     def handle(self, *args, **options):
-        # 只删除产品/订单数据，绝不碰用户账号
-        Product.objects.all().delete()
-        ProductBatch.objects.all().delete()
+        # 只删除临时数据（订单/购物车/评价等），产品和批次使用 get_or_create 保留用户数据
         Order.objects.all().delete()
+        OrderItem.objects.all().delete()
+        Review.objects.all().delete()
+        Cart.objects.all().delete()
+        CartItem.objects.all().delete()
         OrderItem.objects.all().delete()
         Review.objects.all().delete()
         SupplyDemandPost.objects.all().delete()
@@ -320,13 +322,28 @@ class Command(BaseCommand):
         ]
         products = []
         for idx, (fi, name, cat, variety, price, unit, desc) in enumerate(product_data):
-            p = Product.objects.create(
-                farmer=farmers[fi], name=name, category=cat,
-                variety=variety, price=price, unit=unit,
-                description=desc, status='approved'
+            p, _ = Product.objects.get_or_create(
+                farmer=farmers[fi], name=name,
+                defaults={'category': cat, 'variety': variety, 'price': price,
+                          'unit': unit, 'description': desc, 'status': 'approved'}
             )
             products.append(p)
         self.stdout.write(f'  {len(products)} 个产品（已上架，覆盖{len(set(fi for fi,_,_,_,_,_,_ in product_data))}省）')
+
+        # === 批量设置批发价 ===
+        cat_min_qty = {'水果': (10,15), '蔬菜': (10,15), '粮油': (15,20), '干货': (10,20), '茶叶': (5,10), '畜禽': (5,8)}
+        from decimal import Decimal
+        ws_count = 0
+        for p in Product.objects.all():
+            if p.wholesale_price:
+                continue
+            ratio = Decimal(str(round(random.uniform(0.65, 0.80), 2)))
+            p.wholesale_price = (p.price * ratio).quantize(Decimal('0.01'))
+            min_q, max_q = cat_min_qty.get(p.category, (10, 15))
+            p.wholesale_min_quantity = random.randint(min_q, max_q)
+            p.save(update_fields=['wholesale_price', 'wholesale_min_quantity'])
+            ws_count += 1
+        self.stdout.write(f'  {ws_count} 个产品已设置批发价')
 
         # === 待审核产品（8个，分布在8个不同省份，模拟农户提交上架申请） ===
         pending_product_data = [
@@ -341,10 +358,10 @@ class Command(BaseCommand):
         ]
         pending_products = []
         for farmer, name, cat, variety, price, unit, desc in pending_product_data:
-            p = Product.objects.create(
-                farmer=farmer, name=name, category=cat,
-                variety=variety, price=price, unit=unit,
-                description=desc, status='pending'
+            p, _ = Product.objects.get_or_create(
+                farmer=farmer, name=name,
+                defaults={'category': cat, 'variety': variety, 'price': price,
+                          'unit': unit, 'description': desc, 'status': 'pending'}
             )
             pending_products.append(p)
         self.stdout.write(f'  {len(pending_products)} 个待审核产品（管理员后台审批）')
@@ -405,6 +422,13 @@ class Command(BaseCommand):
         batch_map = {}
         total_batches = 0
         for idx in range(n):
+            # 已有已通过批次的产品跳过，不重复创建
+            existing_approved = ProductBatch.objects.filter(product=products[idx], status='approved')
+            if existing_approved.exists():
+                batch_list = list(existing_approved)
+                batch_map[idx] = batch_list
+                total_batches += len(batch_list)
+                continue
             cat = products[idx].category
             qc_list = qc_templates.get(cat, qc_templates['蔬菜'])
             num_batches = random.randint(2, 5)
@@ -430,10 +454,13 @@ class Command(BaseCommand):
 
         # === 待审核批次（10个，申请溯源二维码和编码，管理员后台审批） ===
         pending_batch_count = 0
-        # 从已上架产品中选10个不同省份的产品创建待审核批次
+        # 从已上架产品中选10个不同省份的产品创建待审核批次（不覆盖已有待审核批次）
         pending_batch_candidates = random.sample(range(len(products)), min(10, len(products)))
         for idx in pending_batch_candidates:
             product = products[idx]
+            # 跳过已有待审核批次的产品，避免重复
+            if ProductBatch.objects.filter(product=product, status='pending').exists():
+                continue
             cat = product.category
             qc_list = qc_templates.get(cat, qc_templates['蔬菜'])
             b = ProductBatch.objects.create(
@@ -652,7 +679,7 @@ class Command(BaseCommand):
         self.stdout.write(f'  {len(training_defs)} 个培训课程')
 
         # === 供需对接帖子 ===
-        if farmers:
+        if farmers and consumers:
             SupplyDemandPost.objects.get_or_create(
                 product_name='云南咖啡豆', post_type='supply',
                 defaults={'author': farmers[0].user, 'category': '干货', 'quantity': 500, 'unit': 'kg',
@@ -666,8 +693,8 @@ class Command(BaseCommand):
                     'description': '2025年秋季新米，有机认证，稻花香2号品种，颗粒饱满，口感香甜。'}
             )
             SupplyDemandPost.objects.get_or_create(
-                product_name='新鲜时蔬（每周供应）', post_type='demand',
-                defaults={'author': farmers[2].user, 'category': '蔬菜', 'quantity': 200, 'unit': 'kg',
+                product_name='新鲜时蔬（每周团购需求）', post_type='demand',
+                defaults={'author': consumers[0], 'category': '蔬菜', 'quantity': 200, 'unit': 'kg',
                     'price_range': '3-8元/kg', 'region': '北京市朝阳区',
                     'description': '社区团购每周需要200kg时令蔬菜，要求无农药残留，可长期合作。'}
             )
@@ -678,8 +705,8 @@ class Command(BaseCommand):
                     'description': '赣南脐橙，国家地理标志产品，11月成熟，甜度高、汁多化渣。'}
             )
             SupplyDemandPost.objects.get_or_create(
-                product_name='优质茶叶（长期需求）', post_type='demand',
-                defaults={'author': farmers[12].user, 'category': '茶叶', 'quantity': 100, 'unit': 'kg',
+                product_name='优质茶叶（长期采购需求）', post_type='demand',
+                defaults={'author': consumers[5], 'category': '茶叶', 'quantity': 100, 'unit': 'kg',
                     'price_range': '100-300元/kg', 'region': '浙江省杭州市',
                     'description': '茶庄长期寻找龙井/白茶供应商，要求有质检报告，品质稳定。'}
             )

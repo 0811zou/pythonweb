@@ -11,7 +11,7 @@ from django.utils import timezone
 from django.db.models.functions import TruncMonth
 from decimal import Decimal, InvalidOperation
 from functools import wraps
-from core.models import Product, ProductBatch, Order, OrderItem, FarmerProfile, Review, TraceEvent, SupplyDemandPost, FarmingGuide
+from core.models import Product, ProductBatch, Order, OrderItem, FarmerProfile, Review, TraceEvent, SupplyDemandPost, FarmingGuide, Favorite
 from core.permissions import IsFarmerOwnerOrAdmin, get_farmer_profile
 from products.serializers import ProductSerializer, ProductBatchSerializer, ReviewSerializer, ReviewDetailSerializer
 from trade.serializers import OrderSerializer
@@ -391,14 +391,17 @@ def map_view(request):
 def product_detail_view(request, pk):
     product = get_object_or_404(Product.objects.select_related('farmer__user'), pk=pk)
     has_purchased = False
+    is_favorited = False
     if request.user.is_authenticated:
         has_purchased = OrderItem.objects.filter(
             order__buyer=request.user,
             product_batch__product=product
         ).exclude(order__status='cancelled').exists()
+        is_favorited = Favorite.objects.filter(user=request.user, product=product).exists()
     return render(request, 'product_detail.html', {
         'product': product,
         'has_purchased': has_purchased,
+        'is_favorited': is_favorited,
     })
 
 def product_batches_view(request, pk):
@@ -413,7 +416,7 @@ def product_batches_view(request, pk):
 # ===== 农户端功能 =====
 
 def farmer_required(view_func):
-    """装饰器：检查用户是否为农户"""
+    """装饰器：检查用户是否为农户且已通过审核"""
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -421,8 +424,16 @@ def farmer_required(view_func):
         try:
             request.farmer_profile = request.user.farmerprofile
         except FarmerProfile.DoesNotExist:
-            messages.error(request, '请先注册为农户')
-            return redirect('accounts:register')
+            messages.error(request, '请先注册为农户并提交入驻申请')
+            return redirect('core:apply_join')
+        if not request.farmer_profile.verified:
+            from core.models import JoinApplication
+            app = JoinApplication.objects.filter(user=request.user, status='pending').first()
+            if app:
+                messages.warning(request, '您的入驻申请正在审核中，审核通过后即可使用农户功能。')
+            else:
+                messages.warning(request, '请先提交入驻申请，上传相关证件材料。')
+            return redirect('core:apply_join')
         return view_func(request, *args, **kwargs)
     return wrapper
 
@@ -498,63 +509,107 @@ def farmer_product_create(request):
         description = request.POST.get('description', '').strip()
         price = request.POST.get('price', '0')
         unit = request.POST.get('unit', 'kg')
+        wholesale_price = request.POST.get('wholesale_price', '').strip()
+        wholesale_min_qty = int(request.POST.get('wholesale_min_quantity', '0') or '0')
         try:
             price_value = Decimal(price)
+            wholesale_value = Decimal(wholesale_price) if wholesale_price else None
         except (InvalidOperation, TypeError):
             price_value = Decimal('0')
+            wholesale_value = None
         if not name:
             messages.error(request, '请输入产品名称')
         elif price_value <= 0:
             messages.error(request, '请输入有效的价格')
+        elif wholesale_value is not None and wholesale_value <= 0:
+            messages.error(request, '批发价必须大于0')
+        elif wholesale_value is not None and wholesale_value >= price_value:
+            messages.error(request, '批发价应低于零售价，才能吸引批发客户')
         else:
             product = Product.objects.create(
                 farmer=profile, name=name, category=category,
                 variety=variety, description=description,
-                price=price_value, unit=unit, status='pending'
+                price=price_value, unit=unit,
+                wholesale_price=wholesale_value,
+                wholesale_min_quantity=wholesale_min_qty if wholesale_value else 10,
+                status='pending'
             )
             if request.FILES.get('image'):
                 product.image = request.FILES['image']
                 product.save()
             messages.success(request, f'「{name}」已提交审核')
             return redirect('products:farmer_product_list')
-    return render(request, 'farmer/product_form.html', {'action': '添加'})
+    categories = list(Product.objects.exclude(category='').values_list('category', flat=True).distinct().order_by('category'))
+    varieties = list(Product.objects.exclude(variety='').values_list('variety', flat=True).distinct().order_by('variety'))
+    return render(request, 'farmer/product_form.html', {
+        'action': '添加', 'categories': categories, 'varieties': varieties
+    })
 
 
 @farmer_required
 def farmer_product_edit(request, pk):
-    """农户编辑产品"""
+    """农户编辑产品 — 所有状态均可编辑"""
     profile = request.farmer_profile
     product = get_object_or_404(Product, pk=pk, farmer=profile)
-    if product.status not in ('draft', 'rejected'):
-        messages.warning(request, '只能编辑草稿或未通过审核的产品')
-        return redirect('products:farmer_product_list')
+    is_approved = product.status == 'approved'
     if request.method == 'POST':
         price = request.POST.get('price', product.price)
+        wholesale_price = request.POST.get('wholesale_price', '').strip()
+        wholesale_min_qty = int(request.POST.get('wholesale_min_quantity', '0') or '0')
         try:
             price_value = Decimal(price)
+            wholesale_value = Decimal(wholesale_price) if wholesale_price else None
         except (InvalidOperation, TypeError):
             messages.error(request, '请输入有效的价格')
-            return render(request, 'farmer/product_form.html', {'product': product, 'action': '编辑'})
+            categories = list(Product.objects.exclude(category='').values_list('category', flat=True).distinct().order_by('category'))
+            varieties = list(Product.objects.exclude(variety='').values_list('variety', flat=True).distinct().order_by('variety'))
+            return render(request, 'farmer/product_form.html', {'product': product, 'action': '编辑', 'categories': categories, 'varieties': varieties})
         if price_value <= 0:
             messages.error(request, '请输入有效的价格')
-            return render(request, 'farmer/product_form.html', {'product': product, 'action': '编辑'})
+            categories = list(Product.objects.exclude(category='').values_list('category', flat=True).distinct().order_by('category'))
+            varieties = list(Product.objects.exclude(variety='').values_list('variety', flat=True).distinct().order_by('variety'))
+            return render(request, 'farmer/product_form.html', {'product': product, 'action': '编辑', 'categories': categories, 'varieties': varieties})
+        if wholesale_value is not None and wholesale_value <= 0:
+            messages.error(request, '批发价必须大于0')
+            categories = list(Product.objects.exclude(category='').values_list('category', flat=True).distinct().order_by('category'))
+            varieties = list(Product.objects.exclude(variety='').values_list('variety', flat=True).distinct().order_by('variety'))
+            return render(request, 'farmer/product_form.html', {'product': product, 'action': '编辑', 'categories': categories, 'varieties': varieties})
+        if wholesale_value is not None and wholesale_value >= price_value:
+            messages.error(request, '批发价应低于零售价，才能吸引批发客户')
+            categories = list(Product.objects.exclude(category='').values_list('category', flat=True).distinct().order_by('category'))
+            varieties = list(Product.objects.exclude(variety='').values_list('variety', flat=True).distinct().order_by('variety'))
+            return render(request, 'farmer/product_form.html', {'product': product, 'action': '编辑', 'categories': categories, 'varieties': varieties})
         product.name = request.POST.get('name', product.name)
         product.category = request.POST.get('category', '')
         product.variety = request.POST.get('variety', '')
         product.description = request.POST.get('description', '')
         product.price = price_value
         product.unit = request.POST.get('unit', 'kg')
+        product.wholesale_price = wholesale_value
+        product.wholesale_min_quantity = wholesale_min_qty if wholesale_value else 10
         if request.FILES.get('image'):
             product.image = request.FILES['image']
         if request.POST.get('submit') == 'submit':
-            product.status = 'pending'
-            product.review_note = ''
-            messages.success(request, f'「{product.name}」已重新提交审核')
+            # 已通过的产品修改后需重新审核
+            if product.status == 'approved':
+                product.status = 'pending'
+                product.review_note = ''
+                messages.success(request, f'「{product.name}」已提交修改，等待管理员重新审核')
+            elif product.status == 'pending':
+                messages.success(request, f'「{product.name}」已更新（审核中）')
+            else:
+                product.status = 'pending'
+                product.review_note = ''
+                messages.success(request, f'「{product.name}」已重新提交审核')
         else:
-            messages.success(request, '草稿已保存')
+            messages.success(request, '「{product.name}」已保存')
         product.save()
         return redirect('products:farmer_product_list')
-    return render(request, 'farmer/product_form.html', {'product': product, 'action': '编辑'})
+    categories = list(Product.objects.exclude(category='').values_list('category', flat=True).distinct().order_by('category'))
+    varieties = list(Product.objects.exclude(variety='').values_list('variety', flat=True).distinct().order_by('variety'))
+    return render(request, 'farmer/product_form.html', {
+        'product': product, 'action': '编辑', 'categories': categories, 'varieties': varieties
+    })
 
 
 @farmer_required
@@ -658,6 +713,21 @@ def farmer_batch_create(request):
         return redirect('products:farmer_batch_list')
 
     return render(request, 'farmer/batch_form.html', {'products': products})
+
+
+@farmer_required
+def farmer_batch_delete(request, pk):
+    """农户删除批次 — 仅允许待审核/草稿/未通过的批次"""
+    profile = request.farmer_profile
+    batch = get_object_or_404(ProductBatch, pk=pk, product__farmer=profile)
+    if batch.status == 'approved':
+        messages.error(request, '已通过的批次不能删除，请联系管理员处理')
+        return redirect('products:farmer_batch_list')
+    if request.method == 'POST':
+        batch_name = batch.batch_code or f'#{batch.pk}'
+        batch.delete()
+        messages.success(request, f'批次 {batch_name} 已删除')
+    return redirect('products:farmer_batch_list')
 
 
 @farmer_required

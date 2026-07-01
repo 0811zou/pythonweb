@@ -106,6 +106,9 @@
               </div>
               <h3>{{ product.name }}</h3>
               <span class="badge bg-success bg-opacity-75 px-3 py-2 fs-6 mt-2">¥{{ product.price|floatformat:2 }} / {{ product.unit|default:'kg' }}</span>
+              {% if product.wholesale_price %}
+                <span class="badge bg-warning text-dark px-3 py-2 fs-6 mt-2 ms-1">批发 ¥{{ product.wholesale_price|floatformat:2 }} (满{{ product.wholesale_min_quantity }})</span>
+              {% endif %}
             </div>
           {% endif %}
         </div>
@@ -129,6 +132,13 @@
             ¥{{ product.price|floatformat:2 }}
             <small>/ {{ product.unit|default:'kg' }}</small>
           </div>
+          {% if product.wholesale_price %}
+            <div class="mb-3">
+              <span class="badge bg-warning text-dark fs-6">
+                <i class="bi bi-boxes"></i> 批发价 ¥{{ product.wholesale_price|floatformat:2 }}/{{ product.unit|default:'kg' }}（满 {{ product.wholesale_min_quantity }} {{ product.unit|default:'kg' }}起批）
+              </span>
+            </div>
+          {% endif %}
           <div class="mb-3">
             <span class="badge bg-success bg-opacity-10 text-success">
               <i class="bi bi-heart"></i> 农户到手约 ¥{{ product.price|floatformat:2 }}（平台零利润，纯公益助农）
@@ -149,7 +159,9 @@
               </form>
               <form method="post" action="{% url 'trade:favorite_toggle' product.id %}" class="d-inline">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-outline-danger btn-lg"><i class="bi bi-heart"></i></button>
+                <button type="submit" class="btn btn-outline-danger btn-lg" title="{% if is_favorited %}取消收藏{% else %}收藏{% endif %}">
+                  <i class="bi {% if is_favorited %}bi-heart-fill{% else %}bi-heart{% endif %}"></i>
+                </button>
               </form>
             {% else %}
               <a href="{% url 'accounts:login'  %}?next={{ request.path }}" class="btn btn-success btn-lg"><i class="bi bi-cart-plus"></i> 登录后购买</a>

@@ -1,4 +1,5 @@
 from functools import wraps
+from django.http import Http404
 from django.shortcuts import get_object_or_404, render, redirect
 from django.contrib.auth import login, logout, authenticate
 from django.contrib.auth.decorators import login_required
@@ -11,7 +12,7 @@ from core.models import FarmerProfile, Product, ProductBatch, Review, SubsidyApp
 # ===== 装饰器 =====
 
 def farmer_required(view_func):
-    """装饰器：检查用户是否为农户"""
+    """装饰器：检查用户是否为农户且已通过审核"""
     @wraps(view_func)
     def wrapper(request, *args, **kwargs):
         if not request.user.is_authenticated:
@@ -19,8 +20,17 @@ def farmer_required(view_func):
         try:
             request.farmer_profile = request.user.farmerprofile
         except FarmerProfile.DoesNotExist:
-            messages.error(request, '请先注册为农户')
-            return redirect('accounts:register')
+            messages.error(request, '请先注册为农户并提交入驻申请')
+            return redirect('core:apply_join')
+        if not request.farmer_profile.verified:
+            # 检查是否已提交申请
+            from core.models import JoinApplication
+            app = JoinApplication.objects.filter(user=request.user, status='pending').first()
+            if app:
+                messages.warning(request, '您的入驻申请正在审核中，审核通过后即可使用农户功能。')
+            else:
+                messages.warning(request, '请先提交入驻申请，上传相关证件材料。')
+            return redirect('core:apply_join')
         return view_func(request, *args, **kwargs)
     return wrapper
 
@@ -66,13 +76,12 @@ def register_view(request):
         role = request.POST.get('role', 'consumer')
         if form.is_valid():
             user = form.save()
-            # 如果选择农户身份，自动创建农户档案
-            if role == 'farmer':
-                FarmerProfile.objects.create(user=user, phone='', address='')
             login(request, user)
             messages.success(request, f'注册成功，欢迎 {user.username}！')
+            # 农户注册后需提交入驻申请，审核通过后才能使用农户功能
             if role == 'farmer':
-                return redirect('products:farmer_dashboard')
+                messages.info(request, '请先提交入驻申请，上传相关证件材料，审核通过后即可上架产品。')
+                return redirect('core:apply_join')
             return redirect('products:list')
     else:
         form = UserCreationForm()
@@ -82,8 +91,20 @@ def register_view(request):
 # ===== 农户店铺 =====
 
 def farmer_shop_view(request, farmer_id):
-    """农户公开店铺页 — 增强版：含故事、照片、评价"""
+    """农户公开店铺页 — 增强版：含故事、照片、评价，未通过审核不对外可见"""
     profile = get_object_or_404(FarmerProfile.objects.select_related('user'), pk=farmer_id)
+
+    # 未通过审核的农户：本人引导去申请页，其他人 404
+    if not profile.verified:
+        if request.user.is_authenticated and request.user == profile.user:
+            from core.models import JoinApplication
+            app = JoinApplication.objects.filter(user=request.user, status='pending').first()
+            if app:
+                messages.info(request, '您的入驻申请正在审核中，审核通过后即可开启店铺。请勿重复提交。')
+            else:
+                messages.warning(request, '您的入驻申请尚未通过或已被拒绝，请重新提交申请。')
+            return redirect('core:apply_join')
+        raise Http404('店铺不存在')
     products = Product.objects.filter(farmer=profile, status='approved').order_by('-created_at')
     batches = ProductBatch.objects.filter(
         product__farmer=profile, status='approved'
@@ -177,7 +198,7 @@ def subsidy_create(request):
 
 # ===== 收款方式管理 =====
 
-@login_required
+@farmer_required
 def farmer_payment_methods(request):
     """农户管理收款方式"""
     try:
@@ -195,12 +216,15 @@ def farmer_payment_methods(request):
             if not account_name or not account_number:
                 messages.error(request, '请填写收款人和账号')
             else:
-                FarmerPaymentMethod.objects.create(
+                pm = FarmerPaymentMethod.objects.create(
                     farmer=farmer,
                     method_type=method_type,
                     account_name=account_name,
                     account_number=account_number,
                 )
+                if request.FILES.get('qr_code'):
+                    pm.qr_code = request.FILES['qr_code']
+                    pm.save(update_fields=['qr_code'])
                 messages.success(request, '收款方式添加成功')
         elif action == 'toggle':
             method_id = request.POST.get('method_id')

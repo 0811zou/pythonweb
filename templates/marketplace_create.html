@@ -7,32 +7,33 @@
     <div class="card-body">
       <form method="post">
         {% csrf_token %}
+        <!-- 类型切换 -->
         <div class="mb-3">
           <label class="form-label">类型</label>
           <div class="d-flex gap-3">
             <div class="form-check">
               <input class="form-check-input" type="radio" name="post_type" value="supply" id="type_supply"
-                     {% if is_farmer %}checked{% endif %}>
-              <label class="form-check-label" for="type_supply"><i class="bi bi-box-arrow-up text-success"></i> 供应 <small class="text-muted">（农户）</small></label>
+                     {% if is_farmer %}checked{% endif %}
+                     onchange="togglePostType()">
+              <label class="form-check-label" for="type_supply"><i class="bi bi-box-arrow-up text-success"></i> 供应 <small class="text-muted">（我是农户，我要卖）</small></label>
             </div>
             <div class="form-check">
               <input class="form-check-input" type="radio" name="post_type" value="demand" id="type_demand"
-                     {% if not is_farmer %}checked{% endif %}>
-              <label class="form-check-label" for="type_demand"><i class="bi bi-box-arrow-down text-primary"></i> 需求 <small class="text-muted">（买家）</small></label>
+                     {% if not is_farmer %}checked{% endif %}
+                     onchange="togglePostType()">
+              <label class="form-check-label" for="type_demand"><i class="bi bi-box-arrow-down text-primary"></i> 需求 <small class="text-muted">（我是买家，我要买）</small></label>
             </div>
           </div>
-          <div class="form-text">
-            {% if is_farmer %}
-              <i class="bi bi-info-circle"></i> 作为农户，您可以发布供应信息，向买家展示您的产品。
-            {% else %}
-              <i class="bi bi-info-circle"></i> 作为买家，您可以发布需求信息，让农户了解您的采购意向。
-            {% endif %}
-          </div>
         </div>
+
+        <!-- 产品名称 -->
         <div class="mb-3">
-          <label class="form-label">产品名称 <span class="text-danger">*</span></label>
-          <input type="text" name="product_name" class="form-control" placeholder="例如：云南咖啡豆、五常大米" required>
+          <label class="form-label"><span class="supply-label">产品名称</span><span class="demand-label" style="display:none;">求购产品</span> <span class="text-danger">*</span></label>
+          <input type="text" name="product_name" class="form-control"
+                 placeholder="例如：云南咖啡豆、五常大米" required>
         </div>
+
+        <!-- 分类 -->
         <div class="mb-3">
           <label class="form-label">产品分类</label>
           <select name="category" class="form-select">
@@ -48,9 +49,11 @@
             <option value="其他">其他</option>
           </select>
         </div>
+
+        <!-- 数量 + 单位 -->
         <div class="row g-3 mb-3">
           <div class="col-6">
-            <label class="form-label">数量 <span class="text-danger">*</span></label>
+            <label class="form-label"><span class="supply-label">供应数量</span><span class="demand-label" style="display:none;">采购数量</span> <span class="text-danger">*</span></label>
             <input type="number" name="quantity" class="form-control" min="1" value="100" required>
           </div>
           <div class="col-6">
@@ -65,22 +68,55 @@
             </select>
           </div>
         </div>
+
+        <!-- 价格/预算 -->
         <div class="mb-3">
-          <label class="form-label">价格区间</label>
-          <input type="text" name="price_range" class="form-control" placeholder="例如：40-60元/kg（选填）">
+          <label class="form-label"><span class="supply-label">价格区间</span><span class="demand-label" style="display:none;">预算范围</span></label>
+          <input type="text" name="price_range" class="form-control"
+                 placeholder="例如：40-60元/kg（选填）" id="price_range_input">
         </div>
+
+        <!-- 地区 -->
         <div class="mb-3">
-          <label class="form-label">所在地区 <span class="text-danger">*</span></label>
+          <label class="form-label"><span class="supply-label">所在地区</span><span class="demand-label" style="display:none;">我的地区</span> <span class="text-danger">*</span></label>
           <input type="text" name="region" class="form-control" placeholder="省/市/区" required>
         </div>
+
+        <!-- 描述 -->
         <div class="mb-3">
           <label class="form-label">详细描述</label>
-          <textarea name="description" class="form-control" rows="4" placeholder="描述你的产品特点、采收时间、品质标准等..."></textarea>
+          <textarea name="description" class="form-control" rows="4" id="desc_textarea"
+                    placeholder="描述你的产品特点、采收时间、品质标准等..."></textarea>
         </div>
-        <button type="submit" class="btn btn-success w-100"><i class="bi bi-send"></i> 发布</button>
+
+        <button type="submit" class="btn btn-success w-100" id="submit_btn"><i class="bi bi-send"></i> 发布供应</button>
         <a href="{% url 'marketplace:list'  %}" class="btn btn-outline-secondary w-100 mt-2">取消</a>
       </form>
     </div>
   </div>
 </div>
+
+<script>
+function togglePostType() {
+  const isSupply = document.getElementById('type_supply').checked;
+  document.querySelectorAll('.supply-label').forEach(el => el.style.display = isSupply ? '' : 'none');
+  document.querySelectorAll('.demand-label').forEach(el => el.style.display = isSupply ? 'none' : '');
+  const priceInput = document.getElementById('price_range_input');
+  const descArea = document.getElementById('desc_textarea');
+  const submitBtn = document.getElementById('submit_btn');
+  if (isSupply) {
+    priceInput.placeholder = '例如：40-60元/kg（选填）';
+    descArea.placeholder = '描述你的产品特点、采收时间、品质标准等...';
+    submitBtn.innerHTML = '<i class="bi bi-send"></i> 发布供应';
+    submitBtn.className = 'btn btn-success w-100';
+  } else {
+    priceInput.placeholder = '例如：预算 40-60元/kg（选填）';
+    descArea.placeholder = '描述你需要的产品规格、品质要求、期望交货时间等...';
+    submitBtn.innerHTML = '<i class="bi bi-send"></i> 发布需求';
+    submitBtn.className = 'btn btn-primary w-100';
+  }
+}
+// 初始状态
+togglePostType();
+</script>
 {% endblock %}

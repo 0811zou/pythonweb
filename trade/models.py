@@ -63,8 +63,14 @@ class CartItem(models.Model):
     class Meta:
         db_table = 'core_cartitem'
 
+    def effective_price(self):
+        """返回实际单价：满足起订量条件时自动使用批发价"""
+        if self.product.wholesale_price and self.quantity >= self.product.wholesale_min_quantity:
+            return self.product.wholesale_price
+        return self.product.price
+
     def subtotal(self):
-        return self.product.price * self.quantity
+        return self.effective_price() * self.quantity
 
 
 class Favorite(models.Model):

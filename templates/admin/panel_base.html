@@ -50,6 +50,7 @@
           <a class="nav-link {% if request.resolver_match.url_name == 'admin_batches' %}admin-active{% endif %}" href="{% url 'admin_panel:batches'  %}"><i class="bi bi-box-seam"></i> 批次审核</a>
           <a class="nav-link {% if request.resolver_match.url_name == 'admin_users' %}admin-active{% endif %}" href="{% url 'admin_panel:users'  %}"><i class="bi bi-people"></i> 用户管理</a>
           <a class="nav-link {% if request.resolver_match.url_name == 'applications' %}admin-active{% endif %}" href="{% url 'admin_panel:applications'  %}"><i class="bi bi-person-plus"></i> 入驻审核</a>
+          <a class="nav-link {% if request.resolver_match.url_name == 'payments' %}admin-active{% endif %}" href="{% url 'admin_panel:payments'  %}"><i class="bi bi-credit-card"></i> 支付审核</a>
           <a class="nav-link" href="/admin/" target="_blank"><i class="bi bi-gear"></i> Django Admin</a>
           <a class="nav-link" href="/admin/core/announcement/" target="_blank"><i class="bi bi-megaphone"></i> 通告管理</a>
           <hr class="my-2">

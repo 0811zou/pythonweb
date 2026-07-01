@@ -28,7 +28,12 @@
           {% endif %}
           <div class="flex-grow-1">
             <a href="{% url 'products:detail' item.product.id %}" class="text-decoration-none"><strong>{{ item.product.name }}</strong></a>
-            <div class="text-muted small">¥{{ item.product.price }}/{{ item.product.unit }}</div>
+            <div class="text-muted small">
+              ¥{{ item.product.price }}/{{ item.product.unit }}
+              {% if item.product.wholesale_price %}
+                <span class="text-warning"> | 批发 ¥{{ item.product.wholesale_price }} (满{{ item.product.wholesale_min_quantity }})</span>
+              {% endif %}
+            </div>
           </div>
           <div class="text-end me-3" style="min-width:80px;">
             <div class="d-flex align-items-center">
@@ -39,7 +44,9 @@
               <span class="mx-2 fw-bold">{{ item.quantity }}</span>
               <button class="btn btn-sm btn-outline-success disabled"><i class="bi bi-plus"></i></button>
             </div>
-            <div class="small text-muted mt-1">小计：<strong>¥{{ item.subtotal|floatformat:2 }}</strong></div>
+            <div class="small text-muted mt-1">小计：<strong class="{% if item.effective_price < item.product.price %}text-warning{% endif %}">¥{{ item.subtotal|floatformat:2 }}</strong>
+              {% if item.effective_price < item.product.price %}<span class="text-warning small"> (批发价)</span>{% endif %}
+            </div>
           </div>
         </div>
         {% endfor %}

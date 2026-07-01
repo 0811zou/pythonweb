@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.contrib import messages
 from django.utils import timezone
 from core.models import Product, ProductBatch, Order, FarmerProfile, generate_batch_code, TraceEvent, JoinApplication
-from notifications.notify import notify, notify_farmer
+from notifications.notify import notify, notify_farmer, notify_buyer
 
 
 # ===== 装饰器 =====
@@ -95,8 +95,33 @@ def admin_product_review(request, pk, action):
 
 @admin_required
 def admin_users(request):
-    """管理端 — 用户管理"""
-    users = User.objects.select_related('farmerprofile').all().order_by('-date_joined')
+    """管理端 — 用户管理（含产品与批次信息）"""
+    from products.models import Product
+    users = list(User.objects.select_related('farmerprofile').all().order_by('-date_joined'))
+    # 构建用户ID→索引映射，O(1)查找
+    user_idx = {u.id: i for i, u in enumerate(users)}
+    for u in users:
+        u.user_products = []
+        u.user_batches = []
+    # 产品按农户分组
+    for p in Product.objects.select_related('farmer__user').all().order_by('-created_at'):
+        idx = user_idx.get(p.farmer.user_id)
+        if idx is not None:
+            users[idx].user_products.append(p)
+    # 批次按农户分组
+    for b in ProductBatch.objects.select_related('product__farmer').all().order_by('-created_at'):
+        fid = b.product.farmer_id
+        if fid:
+            idx = user_idx.get(b.product.farmer.user_id)
+            if idx is not None:
+                users[idx].user_batches.append(b)
+    # 批次按产品分组（供产品详情展示已通过批次）
+    product_batches = {}
+    for b in ProductBatch.objects.select_related('product').filter(status='approved').order_by('-created_at'):
+        product_batches.setdefault(b.product_id, []).append(b)
+    for u in users:
+        for p in u.user_products:
+            p.approved_batches = product_batches.get(p.id, [])
     return render(request, 'admin/users.html', {'users': users})
 
 
@@ -105,7 +130,7 @@ def admin_users(request):
 @admin_required
 def admin_batches(request):
     """批次审核列表"""
-    status_filter = request.GET.get('status', 'pending')
+    status_filter = request.GET.get('status', 'all')
     batches = ProductBatch.objects.select_related('product__farmer__user').all()
     if status_filter != 'all':
         batches = batches.filter(status=status_filter)
@@ -186,7 +211,7 @@ def export_products_csv(request):
 def admin_applications(request):
     """入驻申请审核"""
     status_filter = request.GET.get('status', 'pending')
-    apps = JoinApplication.objects.order_by('-created_at')
+    apps = JoinApplication.objects.select_related('user').order_by('-created_at')
     if status_filter and status_filter != 'all':
         apps = apps.filter(status=status_filter)
 
@@ -200,12 +225,30 @@ def admin_applications(request):
             app.reviewer_note = note
             app.reviewed_by = request.user
             app.save()
-            messages.success(request, f'已通过「{app.name}」的入驻申请')
+            # 验证农户资料
+            if app.user:
+                fp, created = FarmerProfile.objects.get_or_create(user=app.user)
+                if not fp.verified:
+                    fp.verified = True
+                    fp.phone = fp.phone or app.phone
+                    fp.address = fp.address or app.region
+                    fp.save(update_fields=['verified', 'phone', 'address'])
+                # 通知农户
+                notify(app.user, 'system',
+                    '入驻申请已通过',
+                    f'恭喜！您的入驻申请已通过审核。现在可以使用农户功能，开始上架产品了！',
+                    reverse('products:farmer_dashboard'))
+            messages.success(request, f'已通过「{app.name}」的入驻申请，农户审核状态已激活')
         elif action == 'reject':
             app.status = 'rejected'
             app.reviewer_note = note
             app.reviewed_by = request.user
             app.save()
+            if app.user:
+                notify(app.user, 'system',
+                    '入驻申请未通过',
+                    f'很遗憾，您的入驻申请未通过审核。原因：{note or "未说明"}。请重新提交申请。',
+                    reverse('core:apply_join'))
             messages.warning(request, f'已拒绝「{app.name}」的入驻申请')
         return redirect('admin_panel:applications')
 
@@ -213,3 +256,80 @@ def admin_applications(request):
         'applications': apps,
         'status_filter': status_filter,
     })
+
+
+# ===== 支付审核 =====
+
+@admin_required
+def admin_payments(request):
+    """管理端 — 付款凭证审核"""
+    status_filter = request.GET.get('status', 'paid_offline')
+    orders = Order.objects.select_related('buyer').prefetch_related(
+        'items__product_batch__product__farmer__user'
+    ).filter(status__in=['paid_offline', 'paid'])
+    if status_filter == 'paid_offline':
+        orders = orders.filter(status='paid_offline')
+    elif status_filter == 'paid':
+        orders = orders.filter(status='paid')
+    elif status_filter == 'all':
+        pass
+    else:
+        orders = orders.filter(status='paid_offline')
+    orders = orders.order_by('-created_at')
+    return render(request, 'admin/payments.html', {
+        'orders': orders,
+        'current_status': status_filter,
+    })
+
+
+@admin_required
+def admin_payment_review(request, pk, action):
+    """管理端 — 审核付款凭证"""
+    if request.method != 'POST':
+        messages.error(request, '请通过页面按钮操作')
+        return redirect('admin_panel:payments')
+    order = get_object_or_404(Order.objects.select_related('buyer').prefetch_related(
+        'items__product_batch__product__farmer__user'
+    ), pk=pk)
+    if action == 'confirm':
+        order.status = 'paid'
+        order.save(update_fields=['status', 'updated_at'])
+        # 通知所有相关农户：付款已确认，请发货
+        for item in order.items.all():
+            if item.product_batch and item.product_batch.product.farmer:
+                try:
+                    notify(item.product_batch.product.farmer.user, 'order',
+                        f'订单 #{order.id} 付款已确认',
+                        f'消费者 {order.buyer.username} 已付款 ¥{order.total_amount}，请尽快安排发货！收货人：{order.receiver_name}，电话：{order.phone}，地址：{order.address}',
+                        reverse('trade:farmer_orders'))
+                except Exception:
+                    pass
+        # 通知买家：支付已确认
+        try:
+            notify_buyer(order, 'order',
+                f'订单 #{order.id} 付款已确认',
+                f'平台已确认您的付款 ¥{order.total_amount}，农户将尽快为您发货。',
+                reverse('trade:consumer_orders'))
+        except Exception:
+            pass
+        messages.success(request, f'订单 #{order.id} 付款已确认，已通知农户发货')
+    elif action == 'reject':
+        note = request.POST.get('note', '').strip()
+        if not note:
+            messages.error(request, '请填写拒绝原因')
+            return redirect('admin_panel:payments')
+        order.status = 'pending'
+        order.payment_proof = ''
+        order.save(update_fields=['status', 'payment_proof', 'updated_at'])
+        # 通知买家：付款凭证被拒
+        try:
+            notify_buyer(order, 'order',
+                f'订单 #{order.id} 付款凭证未通过',
+                f'您的付款凭证审核未通过。原因：{note}。请重新上传正确的付款凭证。',
+                reverse('trade:payment', kwargs={'order_id': order.id}))
+        except Exception:
+            pass
+        messages.warning(request, f'订单 #{order.id} 凭证已退回，已通知买家重新上传')
+    else:
+        messages.error(request, '未知操作')
+    return redirect('admin_panel:payments')

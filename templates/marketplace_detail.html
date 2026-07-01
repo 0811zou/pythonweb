@@ -1,22 +1,26 @@
 {% extends base_template %}
 {% block title %}{{ post.product_name }} - 供需详情 - 智农溯源{% endblock %}
 {% block body %}
-<div class="container py-4" style="max-width:720px;">
+<div class="container py-4" style="max-width:800px;">
   <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb">
       <li class="breadcrumb-item"><a href="/">首页</a></li>
-      <li class="breadcrumb-item"><a href="{% url 'marketplace:list'  %}">供需对接</a></li>
+      <li class="breadcrumb-item"><a href="{% url 'marketplace:list' %}">供需对接</a></li>
       <li class="breadcrumb-item active">{{ post.product_name }}</li>
     </ol>
   </nav>
 
-  <div class="card shadow-sm">
+  {% if messages %}
+    {% for m in messages %}<div class="alert alert-{{ m.tags }} alert-dismissible fade show">{{ m }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endfor %}
+  {% endif %}
+
+  <div class="card shadow-sm mb-4">
     <div class="card-body">
       <div class="d-flex justify-content-between align-items-start mb-3">
         <span class="badge fs-6 {% if post.post_type == 'supply' %}bg-success{% else %}bg-primary{% endif %}">
           {{ post.get_post_type_display }}
         </span>
-        {% if post.status == 'closed' %}<span class="badge bg-secondary">已关闭</span>{% endif %}
+        {% if post.status == 'closed' %}<span class="badge bg-secondary fs-6">已关闭</span>{% endif %}
       </div>
       <h3 class="fw-bold mb-3">{{ post.product_name }}</h3>
 
@@ -50,22 +54,161 @@
       </div>
 
       {% if post.description %}
-      <h5>详细描述</h5>
+      <h5 class="fw-bold">详细描述</h5>
       <p style="white-space:pre-line;line-height:1.8;">{{ post.description }}</p>
       {% endif %}
 
       <hr>
-      <div class="d-flex justify-content-between align-items-center">
+
+      {# ── 发帖人信息 ── #}
+      <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
           <i class="bi bi-person-circle"></i> <strong>{{ post.author.username }}</strong>
           <span class="text-muted ms-2">发布于 {{ post.created_at|date:'Y-m-d H:i' }}</span>
         </div>
+        {% if is_author %}
+        <div>
+          {% if post.status == 'active' %}
+          <form method="post" class="d-inline" onsubmit="return confirm('确定关闭该帖子？')">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="close">
+            <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x-circle"></i> 关闭帖子</button>
+          </form>
+          {% else %}
+          <form method="post" class="d-inline" onsubmit="return confirm('确定重新开启该帖子？')">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reopen">
+            <button type="submit" class="btn btn-outline-success btn-sm"><i class="bi bi-arrow-repeat"></i> 重新开启</button>
+          </form>
+          {% endif %}
+        </div>
+        {% endif %}
       </div>
+
+      {# ── 供应帖：联系农户 + 购买 ── #}
+      {% if post.post_type == 'supply' and post.status == 'active' %}
+      <div class="card border-success mb-0">
+        <div class="card-header bg-success bg-opacity-10 border-success">
+          <i class="bi bi-info-circle text-success"></i> <strong>联系农户 / 购买</strong>
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+            {% if author_phone %}
+            <div class="col-md-4">
+              <div class="d-flex align-items-center gap-2 p-2 bg-light rounded-3 h-100">
+                <i class="bi bi-telephone-fill text-success fs-4"></i>
+                <div>
+                  <small class="text-muted d-block">联系电话</small>
+                  <strong class="fs-5">{{ author_phone }}</strong>
+                </div>
+              </div>
+            </div>
+            {% endif %}
+            {% if author_address %}
+            <div class="col-md-4">
+              <div class="d-flex align-items-center gap-2 p-2 bg-light rounded-3 h-100">
+                <i class="bi bi-geo-alt-fill text-success fs-4"></i>
+                <div>
+                  <small class="text-muted d-block">地址</small>
+                  <strong>{{ author_address|truncatechars:20 }}</strong>
+                </div>
+              </div>
+            </div>
+            {% endif %}
+            <div class="col-md-{% if author_phone and author_address %}4{% elif author_phone or author_address %}8{% else %}12{% endif %}">
+              <div class="d-flex flex-wrap gap-2 h-100 align-items-center justify-content-end">
+                {% if author_shop_url %}
+                <a href="{{ author_shop_url }}" class="btn btn-outline-success">
+                  <i class="bi bi-shop"></i> 查看农户店铺
+                </a>
+                {% endif %}
+                {% if matching_product %}
+                <a href="{% url 'trade:order_create' %}?product={{ matching_product.id }}" class="btn btn-success">
+                  <i class="bi bi-cart-plus"></i> 立即购买
+                </a>
+                <a href="{% url 'products:detail' matching_product.id %}" class="btn btn-outline-success">
+                  <i class="bi bi-eye"></i> 查看产品
+                </a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% if not author_phone and not author_address and not matching_product %}
+          <p class="text-muted small mb-0">
+            <i class="bi bi-info-circle"></i>
+            {% if author_shop_url %}农户暂未完善联系方式，可前往店铺查看详情。{% else %}暂无更多联系方式。{% endif %}
+          </p>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {# ── 需求帖：农户主动提供的产品响应 ── #}
+      {% if post.post_type == 'demand' and post.status == 'active' %}
+      <div class="card border-primary mb-0">
+        <div class="card-header bg-primary bg-opacity-10 border-primary d-flex justify-content-between align-items-center">
+          <span><i class="bi bi-people-fill text-primary"></i> <strong>农户响应</strong>
+          <small class="text-muted ms-2">— 农户主动提供货源，买家可直接选购</small></span>
+          {% if user.is_authenticated %}
+            {% if is_farmer and not is_author %}
+              {% if user_has_responded %}
+              <span class="badge bg-secondary"><i class="bi bi-check"></i> 已响应</span>
+              {% else %}
+              <a href="{% url 'marketplace:respond' post.pk %}" class="btn btn-sm btn-primary"><i class="bi bi-reply-fill"></i> 我有货源</a>
+              {% endif %}
+            {% endif %}
+          {% endif %}
+        </div>
+        <div class="card-body">
+          {% if farmer_responses %}
+          <div class="row g-2">
+            {% for resp in farmer_responses %}
+            <div class="col-md-6">
+              <div class="border rounded-3 p-3">
+                <div class="d-flex align-items-start gap-2 mb-2">
+                  {% if resp.product.image %}
+                  <img src="{{ resp.product.image.url }}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;">
+                  {% else %}
+                  <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width:48px;height:48px;">
+                    <i class="bi bi-basket text-muted"></i>
+                  </div>
+                  {% endif %}
+                  <div class="flex-grow-1">
+                    <strong>{{ resp.product.name }}</strong>
+                    <div class="small text-muted">
+                      <i class="bi bi-person"></i> {{ resp.farmer.user.username }}
+                      · ¥{{ resp.product.price }}/{{ resp.product.unit|default:'kg' }}
+                    </div>
+                  </div>
+                </div>
+                {% if resp.message %}
+                <div class="bg-light rounded p-2 small mb-2">
+                  <i class="bi bi-chat-left-quote text-primary"></i> {{ resp.message }}
+                </div>
+                {% endif %}
+                <div class="d-flex gap-2">
+                  <a href="{% url 'trade:order_create' %}?product={{ resp.product.id }}" class="btn btn-sm btn-primary flex-grow-1"><i class="bi bi-cart"></i> 购买</a>
+                  <a href="{% url 'products:detail' resp.product.id %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye"></i></a>
+                  <a href="{% url 'accounts:farmer_shop' resp.farmer.id %}" class="btn btn-sm btn-outline-success" title="查看店铺"><i class="bi bi-shop"></i></a>
+                </div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-muted small mb-0">
+            <i class="bi bi-info-circle"></i>
+            暂无农户响应此需求。{% if is_farmer and not is_author and not user_has_responded %}你是农户？<a href="{% url 'marketplace:respond' post.pk %}" class="fw-bold">点击响应</a>，向买家提供你的产品。{% endif %}
+          </p>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
     </div>
   </div>
 
-  <div class="text-center mt-3">
-    <a href="{% url 'marketplace:list'  %}" class="btn btn-outline-success"><i class="bi bi-arrow-left"></i> 返回列表</a>
+  <div class="text-center">
+    <a href="{% url 'marketplace:list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> 返回列表</a>
   </div>
 </div>
 {% endblock %}

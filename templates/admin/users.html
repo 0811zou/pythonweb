@@ -6,10 +6,15 @@
   <div class="card-body p-0">
     <div class="table-responsive">
       <table class="table table-hover mb-0">
-        <thead><tr><th>ID</th><th>用户名</th><th>邮箱</th><th>角色</th><th>农户信息</th><th>注册时间</th><th>是否管理员</th></tr></thead>
+        <thead><tr><th style="width:40px;"></th><th>ID</th><th>用户名</th><th>邮箱</th><th>角色</th><th>产品/批次</th><th>注册时间</th><th>管理员</th></tr></thead>
         <tbody>
           {% for u in users %}
           <tr>
+            <td>
+              <button class="btn btn-sm btn-outline-secondary toggle-detail" data-target="user-detail-{{ u.id }}" title="查看详情">
+                <i class="bi bi-chevron-down"></i>
+              </button>
+            </td>
             <td>{{ u.id }}</td>
             <td><strong>{{ u.username }}</strong></td>
             <td><small>{{ u.email|default:'-' }}</small></td>
@@ -19,16 +24,199 @@
               {% elif u.farmerprofile %}<span class="badge bg-success">农户</span>
               {% else %}<span class="badge bg-info text-dark">消费者</span>{% endif %}
             </td>
-            <td class="small">{% if u.farmerprofile %}{{ u.farmerprofile.phone|default:'-' }} / {{ u.farmerprofile.address|default:'-' }}{% else %}-{% endif %}</td>
+            <td class="small">
+              {% if u.user_products or u.user_batches %}
+                产品 {{ u.user_products|length }} / 批次 {{ u.user_batches|length }}
+              {% else %}-{% endif %}
+            </td>
             <td class="small">{{ u.date_joined|date:'Y-m-d' }}</td>
             <td><span class="badge bg-{% if u.is_staff %}success{% else %}secondary{% endif %}">{{ u.is_staff|yesno:'是,否' }}</span></td>
           </tr>
+          {# ── 展开详情行 ── #}
+          <tr id="user-detail-{{ u.id }}" class="user-detail-row" style="display:none;">
+            <td colspan="8" class="bg-light">
+              <div class="p-3">
+                {# 基本信息 #}
+                <h6 class="fw-bold mb-3"><i class="bi bi-person-vcard"></i> 用户信息</h6>
+                <table class="table table-sm mb-3">
+                  <tr><td style="width:100px;"><strong>用户名</strong></td><td>{{ u.username }}</td><td style="width:100px;"><strong>邮箱</strong></td><td>{{ u.email|default:'未填写' }}</td></tr>
+                  <tr><td><strong>角色</strong></td><td colspan="3">
+                    {% if u.is_superuser %}超级管理员
+                    {% elif u.is_staff %}管理员
+                    {% elif u.farmerprofile %}农户
+                    {% else %}消费者{% endif %}
+                    {% if u.farmerprofile %}&nbsp;·&nbsp;店铺：{{ u.farmerprofile.farm_name|default:'未设置' }}{% endif %}
+                  </td></tr>
+                  {% if u.farmerprofile %}
+                  <tr><td><strong>电话</strong></td><td>{{ u.farmerprofile.phone|default:'未填写' }}</td><td><strong>地址</strong></td><td>{{ u.farmerprofile.address|default:'未填写' }}</td></tr>
+                  {% endif %}
+                  <tr><td><strong>注册时间</strong></td><td>{{ u.date_joined|date:'Y-m-d H:i:s' }}</td><td><strong>最后登录</strong></td><td>{{ u.last_login|date:'Y-m-d H:i:s'|default:'从未登录' }}</td></tr>
+                </table>
+
+                {# 产品列表 — 可展开查看详情，类似产品审核页 #}
+                {% if u.user_products %}
+                <h6 class="fw-bold mb-2"><i class="bi bi-basket"></i> 产品 ({{ u.user_products|length }})</h6>
+                <div class="table-responsive mb-3">
+                  <table class="table table-sm table-bordered mb-0">
+                    <thead class="table-light"><tr><th style="width:32px;"></th><th style="width:50px;">图片</th><th>产品名</th><th>分类</th><th>品种</th><th>零售价</th><th>批发价</th><th>状态</th><th>时间</th></tr></thead>
+                    <tbody>
+                      {% for prod in u.user_products %}
+                      <tr>
+                        <td>
+                          <button class="btn btn-sm btn-outline-secondary toggle-prod-detail" data-target="prod-detail-{{ u.id }}-{{ prod.id }}" title="查看详情" style="padding:0 4px;font-size:11px;">
+                            <i class="bi bi-chevron-down"></i>
+                          </button>
+                        </td>
+                        <td>
+                          {% if prod.image %}
+                            <img src="{{ prod.image.url }}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;">
+                          {% else %}
+                            <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width:36px;height:36px;">
+                              <i class="bi bi-image text-muted" style="font-size:11px;"></i>
+                            </div>
+                          {% endif %}
+                        </td>
+                        <td><strong>{{ prod.name }}</strong></td>
+                        <td><small>{{ prod.category|default:'-' }}</small></td>
+                        <td><small>{{ prod.variety|default:'-' }}</small></td>
+                        <td>¥{{ prod.price }}/{{ prod.unit|default:'kg' }}</td>
+                        <td>{% if prod.wholesale_price %}<span class="text-warning small">¥{{ prod.wholesale_price }} <br>(满{{ prod.wholesale_min_quantity }})</span>{% else %}-{% endif %}</td>
+                        <td>
+                          {% if prod.status == 'approved' %}<span class="badge bg-success">已上架</span>
+                          {% elif prod.status == 'pending' %}<span class="badge bg-warning text-dark">待审核</span>
+                          {% elif prod.status == 'rejected' %}<span class="badge bg-danger">未通过</span>
+                          {% elif prod.status == 'draft' %}<span class="badge bg-secondary">草稿</span>
+                          {% else %}{{ prod.status }}{% endif %}
+                        </td>
+                        <td class="small">{{ prod.created_at|date:'m-d H:i' }}</td>
+                      </tr>
+                      {# ── 产品展开详情行 ── #}
+                      <tr id="prod-detail-{{ u.id }}-{{ prod.id }}" class="prod-detail-row" style="display:none;">
+                        <td colspan="9" class="bg-white">
+                          <div class="row p-2">
+                            <div class="col-md-3 text-center">
+                              {% if prod.image %}
+                                <img src="{{ prod.image.url }}" class="img-thumbnail" style="max-height:120px;">
+                              {% else %}
+                                <div class="bg-secondary bg-opacity-10 rounded d-flex align-items-center justify-content-center" style="height:100px;">
+                                  <i class="bi bi-image text-muted" style="font-size:2rem;"></i>
+                                </div>
+                              {% endif %}
+                            </div>
+                            <div class="col-md-9">
+                              <table class="table table-sm mb-0">
+                                <tr><td style="width:70px;"><strong>名称</strong></td><td>{{ prod.name }}</td><td style="width:70px;"><strong>分类</strong></td><td>{{ prod.category|default:'未填写' }}</td></tr>
+                                <tr><td><strong>品种</strong></td><td>{{ prod.variety|default:'未填写' }}</td><td><strong>单位</strong></td><td>{{ prod.unit|default:'kg' }}</td></tr>
+                                <tr><td><strong>零售价</strong></td><td>¥{{ prod.price }}</td><td><strong>批发价</strong></td><td>{% if prod.wholesale_price %}¥{{ prod.wholesale_price }}（满 {{ prod.wholesale_min_quantity }} {{ prod.unit|default:'kg' }}）{% else %}未设置{% endif %}</td></tr>
+                                <tr><td><strong>状态</strong></td><td colspan="3">
+                                  {% if prod.status == 'approved' %}<span class="badge bg-success">已上架</span>
+                                  {% elif prod.status == 'pending' %}<span class="badge bg-warning text-dark">待审核</span>
+                                  {% elif prod.status == 'rejected' %}<span class="badge bg-danger">未通过</span>{% if prod.review_note %} — {{ prod.review_note }}{% endif %}
+                                  {% else %}<span class="badge bg-secondary">草稿</span>{% endif %}
+                                </td></tr>
+                                <tr><td><strong>描述</strong></td><td colspan="3">{{ prod.description|default:'未填写'|linebreaksbr }}</td></tr>
+                                <tr><td><strong>创建</strong></td><td>{{ prod.created_at|date:'Y-m-d H:i:s' }}</td><td><strong>ID</strong></td><td>#{{ prod.id }}</td></tr>
+                              </table>
+                              {% if prod.approved_batches %}
+                              <h6 class="fw-bold mt-3 mb-2"><i class="bi bi-check-circle text-success"></i> 已通过批次 ({{ prod.approved_batches|length }})</h6>
+                              <div class="table-responsive" style="max-height:180px;overflow-y:auto;">
+                                <table class="table table-sm table-bordered mb-0">
+                                  <thead class="table-success"><tr><th>批次编号</th><th>数量</th><th>收获日期</th><th>质检报告</th><th>溯源</th></tr></thead>
+                                  <tbody>
+                                    {% for bat in prod.approved_batches %}
+                                    <tr>
+                                      <td><code>{{ bat.batch_code }}</code></td>
+                                      <td>{{ bat.quantity }} {{ prod.unit|default:'kg' }}</td>
+                                      <td class="small">{{ bat.harvest_date|date:'Y-m-d'|default:'-' }}</td>
+                                      <td class="small">{{ bat.qc_report|default:'-'|truncatechars:40 }}</td>
+                                      <td><a href="{% url 'traceability:trace' bat.batch_code %}" class="btn btn-sm btn-outline-success" target="_blank"><i class="bi bi-search"></i></a></td>
+                                    </tr>
+                                    {% endfor %}
+                                  </tbody>
+                                </table>
+                              </div>
+                              {% endif %}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+                {% else %}
+                <p class="text-muted small mb-3"><i class="bi bi-inbox"></i> 暂无产品</p>
+                {% endif %}
+
+                {# 批次列表 #}
+                {% if u.user_batches %}
+                <h6 class="fw-bold mb-2"><i class="bi bi-box-seam"></i> 批次 ({{ u.user_batches|length }})</h6>
+                <div class="table-responsive" style="max-height:240px;overflow-y:auto;">
+                  <table class="table table-sm table-bordered mb-0">
+                    <thead class="table-light"><tr><th>批次编号</th><th>对应产品</th><th>数量</th><th>状态</th><th>采收日期</th><th>创建时间</th></tr></thead>
+                    <tbody>
+                      {% for b in u.user_batches %}
+                      <tr>
+                        <td><small>{{ b.batch_code|default:'待生成' }}</small></td>
+                        <td>{{ b.product.name }}</td>
+                        <td>{{ b.quantity }}</td>
+                        <td>
+                          {% if b.status == 'approved' %}<span class="badge bg-success">已通过</span>
+                          {% elif b.status == 'pending' %}<span class="badge bg-warning text-dark">待质检</span>
+                          {% elif b.status == 'rejected' %}<span class="badge bg-danger">未通过</span>
+                          {% else %}{{ b.status }}{% endif %}
+                        </td>
+                        <td class="small">{{ b.harvest_date|date:'Y-m-d'|default:'-' }}</td>
+                        <td class="small">{{ b.created_at|date:'m-d H:i' }}</td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+                {% else %}
+                <p class="text-muted small"><i class="bi bi-inbox"></i> 暂无批次</p>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
           {% empty %}
-          <tr><td colspan="7" class="text-center py-4 text-muted">暂无用户</td></tr>
+          <tr><td colspan="8" class="text-center py-4 text-muted">暂无用户</td></tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   </div>
 </div>
+
+<script>
+// 用户详情展开
+document.querySelectorAll('.toggle-detail').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const target = document.getElementById(this.dataset.target);
+    const icon = this.querySelector('i');
+    if (target.style.display === 'none') {
+      target.style.display = '';
+      icon.className = 'bi bi-chevron-up';
+    } else {
+      target.style.display = 'none';
+      icon.className = 'bi bi-chevron-down';
+    }
+  });
+});
+// 产品详情展开（嵌套在用户详情内）
+document.querySelectorAll('.toggle-prod-detail').forEach(btn => {
+  btn.addEventListener('click', function(e) {
+    e.stopPropagation();
+    const target = document.getElementById(this.dataset.target);
+    const icon = this.querySelector('i');
+    if (target.style.display === 'none') {
+      target.style.display = '';
+      icon.className = 'bi bi-chevron-up';
+    } else {
+      target.style.display = 'none';
+      icon.className = 'bi bi-chevron-down';
+    }
+  });
+});
+</script>
 {% endblock %}

@@ -12,9 +12,15 @@
     <div class="text-center mb-4">
       {% if user.is_authenticated %}
         {% if is_farmer %}
+          {% if user.farmerprofile.verified %}
         <a href="{% url 'accounts:farmer_shop' user.farmerprofile.id %}" class="btn btn-success btn-lg">
           <i class="bi bi-shop"></i> 进入我的店铺
         </a>
+          {% else %}
+        <a href="{% url 'core:apply_join' %}" class="btn btn-outline-warning btn-lg">
+          <i class="bi bi-hourglass-split"></i> 查看入驻进度
+        </a>
+          {% endif %}
         {% else %}
         <div class="alert alert-info d-inline-block text-start" style="max-width:500px;">
           <i class="bi bi-info-circle"></i> <strong>您是消费者账号</strong><br>

@@ -74,17 +74,35 @@
   </div>
   {% endif %}
 
-  <!-- 支付确认 -->
-  <form method="post" class="card">
+  <!-- 付款凭证上传 -->
+  <form method="post" enctype="multipart/form-data" class="card">
     {% csrf_token %}
-    <div class="card-header bg-white"><strong><i class="bi bi-shield-check"></i> 确认支付</strong></div>
-    <div class="card-body text-center">
-      <p class="text-muted mb-3">请按照上方收款信息完成转账后，点击下方按钮确认</p>
-      <input type="hidden" name="payment_method" value="模拟支付">
+    <div class="card-header bg-white"><strong><i class="bi bi-shield-check"></i> 上传付款凭证</strong></div>
+    <div class="card-body">
+      <p class="text-muted mb-3">请按照上方农户收款信息完成转账后，上传付款截图。平台管理员审核通过后即确认支付，农户将安排发货。</p>
+      <div class="mb-3">
+        <label class="form-label fw-bold">选择付款方式</label>
+        <select name="payment_method" class="form-select" required>
+          <option value="">-- 请选择 --</option>
+          <option value="wechat">微信支付</option>
+          <option value="alipay">支付宝</option>
+          <option value="bank">银行卡转账</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-bold">上传付款截图 <span class="text-danger">*</span></label>
+        <input type="file" name="payment_proof" class="form-control" accept="image/*" required>
+        <div class="form-text">请上传清晰的付款成功截图，包含金额和收款方信息</div>
+      </div>
+      <div class="alert alert-warning small mb-0">
+        <i class="bi bi-info-circle"></i> <strong>审核说明：</strong>上传凭证后管理员会在 1 小时内审核确认，审核通过后农户收到发货通知。
+      </div>
+    </div>
+    <div class="card-footer bg-white text-center">
       <button type="submit" class="btn btn-success btn-lg px-5">
-        <i class="bi bi-check-circle"></i> 确认已支付
+        <i class="bi bi-cloud-upload"></i> 提交付款凭证
       </button>
-      <p class="small text-muted mt-2">支付完成后，农户将收到通知并为您安排发货</p>
+      <p class="small text-muted mt-2 mb-0">提交后等待管理员审核确认</p>
     </div>
   </form>
 

@@ -1,8 +1,11 @@
 from django.shortcuts import get_object_or_404, render, redirect
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.db.models import Q
 from core.models import SupplyDemandPost, Product, FarmerProfile
+from .models import DemandResponse
+from notifications.notify import notify
 
 
 def supply_demand_list(request):
@@ -105,5 +108,138 @@ def supply_demand_create(request):
 
 def supply_demand_detail(request, pk):
     """供需帖子详情"""
-    post = get_object_or_404(SupplyDemandPost.objects.select_related('author'), pk=pk)
-    return render(request, 'marketplace_detail.html', {'post': post})
+    post = get_object_or_404(
+        SupplyDemandPost.objects.select_related('author'),
+        pk=pk
+    )
+
+    # 关闭自己的帖子
+    if request.method == 'POST' and request.user == post.author:
+        action = request.POST.get('action', '')
+        if action == 'close' and post.status == 'active':
+            post.status = 'closed'
+            post.save(update_fields=['status'])
+            messages.success(request, '帖子已关闭')
+        elif action == 'reopen' and post.status == 'closed':
+            post.status = 'active'
+            post.save(update_fields=['status'])
+            messages.success(request, '帖子已重新开启')
+        return redirect('marketplace:detail', pk=post.pk)
+
+    # 获取发帖人的联系方式
+    author_profile = None
+    author_phone = ''
+    author_address = ''
+    author_shop_url = ''
+    try:
+        author_profile = post.author.farmerprofile
+        author_phone = author_profile.phone or ''
+        author_address = author_profile.address or ''
+        from django.urls import reverse
+        author_shop_url = reverse('accounts:farmer_shop', args=[author_profile.id])
+    except FarmerProfile.DoesNotExist:
+        pass
+
+    # 供应帖：尝试匹配发帖人的同名产品
+    matching_product = None
+    if post.post_type == 'supply' and author_profile:
+        matching_product = Product.objects.filter(
+            farmer=author_profile,
+            name__iexact=post.product_name,
+            status='approved',
+        ).first()
+        if not matching_product:
+            matching_product = Product.objects.filter(
+                farmer=author_profile,
+                name__icontains=post.product_name,
+                status='approved',
+            ).first()
+
+    # 需求帖：获取农户主动响应的产品
+    farmer_responses = []
+    if post.post_type == 'demand':
+        farmer_responses = list(post.responses.select_related(
+            'farmer__user', 'product'
+        ).order_by('-created_at'))
+
+    # 当前登录农户是否已响应过
+    user_has_responded = False
+    user_farmer_profile = None
+    if request.user.is_authenticated:
+        try:
+            user_farmer_profile = request.user.farmerprofile
+            if user_farmer_profile.verified:
+                user_has_responded = post.responses.filter(farmer=user_farmer_profile).exists()
+        except FarmerProfile.DoesNotExist:
+            pass
+
+    is_author = request.user == post.author if request.user.is_authenticated else False
+
+    return render(request, 'marketplace_detail.html', {
+        'post': post,
+        'author_phone': author_phone,
+        'author_address': author_address,
+        'author_shop_url': author_shop_url,
+        'matching_product': matching_product,
+        'farmer_responses': farmer_responses,
+        'user_has_responded': user_has_responded,
+        'is_farmer': bool(user_farmer_profile and user_farmer_profile.verified),
+        'is_author': is_author,
+    })
+
+
+@login_required
+def respond_to_demand(request, pk):
+    """农户主动响应需求帖，提供自己的产品"""
+    post = get_object_or_404(SupplyDemandPost, pk=pk, post_type='demand', status='active')
+
+    # 仅农户可响应
+    try:
+        farmer = request.user.farmerprofile
+        if not farmer.verified:
+            messages.warning(request, '您的入驻申请尚未通过审核，审核通过后即可响应需求。')
+            return redirect('marketplace:detail', pk=pk)
+    except FarmerProfile.DoesNotExist:
+        messages.error(request, '只有入驻农户才能响应需求')
+        return redirect('marketplace:detail', pk=pk)
+
+    # 不能响应自己的需求帖
+    if post.author == request.user:
+        messages.warning(request, '不能响应自己发布的需求帖')
+        return redirect('marketplace:detail', pk=pk)
+
+    # 检查是否已响应过
+    if DemandResponse.objects.filter(demand_post=post, farmer=farmer).exists():
+        messages.info(request, '您已对该需求响应过了')
+        return redirect('marketplace:detail', pk=pk)
+
+    # 获取该农户已上架且同品类的产品
+    farmer_products = Product.objects.filter(
+        farmer=farmer, status='approved'
+    ).filter(
+        Q(category=post.category) | Q(category='')
+    ).order_by('-created_at')
+
+    if request.method == 'POST':
+        product_id = request.POST.get('product_id')
+        message = request.POST.get('message', '').strip()
+        product = get_object_or_404(Product, pk=product_id, farmer=farmer, status='approved')
+
+        DemandResponse.objects.create(
+            farmer=farmer,
+            demand_post=post,
+            product=product,
+            message=message,
+        )
+        # 通知需求发布者
+        notify(post.author, 'demand_response',
+            f'农户 {request.user.username} 响应了你的需求「{post.product_name}」',
+            f'提供了「{product.name}」¥{product.price}/{product.unit}，{message or ""}',
+            reverse('marketplace:detail', args=[pk]))
+        messages.success(request, f'已用「{product.name}」响应该需求，买家已收到通知！')
+        return redirect('marketplace:detail', pk=pk)
+
+    return render(request, 'marketplace_respond.html', {
+        'post': post,
+        'farmer_products': farmer_products,
+    })

@@ -29,7 +29,9 @@ class Product(models.Model):
     category = models.CharField(max_length=100, blank=True)
     variety = models.CharField(max_length=100, blank=True)
     description = models.TextField(blank=True)
-    price = models.DecimalField(max_digits=10, decimal_places=2)
+    price = models.DecimalField(max_digits=10, decimal_places=2, verbose_name='零售单价')
+    wholesale_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True, verbose_name='批发单价')
+    wholesale_min_quantity = models.PositiveIntegerField(default=10, verbose_name='批发起订量')
     unit = models.CharField(max_length=50, default='kg')
     image = models.ImageField(upload_to='products/', blank=True, null=True, help_text='产品图片')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
@@ -81,6 +83,15 @@ class ProductBatch(models.Model):
         # 状态变为已通过且无批次编码时自动生成
         if self.status == 'approved' and not self.batch_code:
             self.batch_code = generate_batch_code()
+        # 状态变为非已通过时，清除之前生成的编码和二维码
+        if self.pk and self.status != 'approved':
+            try:
+                old = ProductBatch.objects.only('status').get(pk=self.pk)
+                if old.status == 'approved' and self.status != 'approved':
+                    self.batch_code = None
+                    self.qr_code = None
+            except ProductBatch.DoesNotExist:
+                pass
         is_new = self._state.adding
         super().save(*args, **kwargs)
         if is_new and self.status == 'approved':

@@ -43,7 +43,7 @@
             <tr><td class="text-muted" style="width:100px;">产品名称</td><td><strong>{{ batch.product.name }}</strong></td></tr>
             <tr><td class="text-muted">类别</td><td>{{ batch.product.category|default:'未分类' }}</td></tr>
             <tr><td class="text-muted">品种</td><td>{{ batch.product.variety|default:'未记录' }}</td></tr>
-            <tr><td class="text-muted">单价</td><td>¥{{ batch.product.price }} / {{ batch.product.unit|default:'kg' }}</td></tr>
+            <tr><td class="text-muted">单价</td><td>¥{{ batch.product.price }} / {{ batch.product.unit|default:'kg' }}{% if batch.product.wholesale_price %} <span class="badge bg-warning text-dark">批发 ¥{{ batch.product.wholesale_price }}</span>{% endif %}</td></tr>
             <tr><td class="text-muted">批次数量</td><td>{{ batch.quantity }}</td></tr>
           </table>
         </div>

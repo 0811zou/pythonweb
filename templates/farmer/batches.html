@@ -40,6 +40,12 @@
               {% if b.qr_code %}
                 <a href="{% url 'products:download_qr' b.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-download"></i> 二维码</a>
               {% endif %}
+              {% if b.status != 'approved' %}
+                <form method="post" action="{% url 'products:farmer_batch_delete' b.pk %}" class="d-inline" onsubmit="return confirm('确定删除该批次？此操作不可恢复。')">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                </form>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}

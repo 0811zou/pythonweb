@@ -10,47 +10,162 @@
 </div>
 <div class="card">
   <div class="card-body p-0">
-    <table class="table table-hover mb-0">
-      <thead class="table-light">
-        <tr><th>批次编号</th><th>产品</th><th>农户</th><th>数量</th><th>状态</th><th>创建时间</th><th>操作</th></tr>
-      </thead>
-      <tbody>
-        {% for b in batches %}
-        <tr>
-          <td><code>{{ b.batch_code }}</code></td>
-          <td><strong>{{ b.product.name }}</strong></td>
-          <td>{{ b.product.farmer.user.username }}</td>
-          <td>{{ b.quantity }}</td>
-          <td>
-            {% if b.status == 'approved' %}<span class="badge bg-success">已通过</span>
-            {% elif b.status == 'pending' %}<span class="badge bg-warning text-dark">待审核</span>
-            {% elif b.status == 'rejected' %}<span class="badge bg-danger">未通过</span>
-            {% else %}<span class="badge bg-secondary">{{ b.status }}</span>{% endif %}
-          </td>
-          <td class="small">{{ b.created_at|date:'Y-m-d' }}</td>
-          <td>
-            {% if b.status == 'pending' %}
-            <form method="post" action="{% url 'admin_panel:batch_review' b.id 'approve' %}" class="d-inline">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check"></i> 通过</button>
-            </form>
-            <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ b.id }}"><i class="bi bi-x"></i> 拒绝</button>
-            <div class="modal fade" id="rejectModal{{ b.id }}"><div class="modal-dialog"><form method="post" action="{% url 'admin_panel:batch_review' b.id 'reject' %}" class="modal-content">
-              {% csrf_token %}<div class="modal-header"><h5 class="modal-title">拒绝批次 {{ b.batch_code }}</h5></div>
-              <div class="modal-body"><textarea name="note" class="form-control" rows="3" placeholder="填写拒绝原因..."></textarea></div>
-              <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button type="submit" class="btn btn-danger">确认拒绝</button></div>
-            </form></div></div>
-            {% else %}
-            <span class="text-muted small">——</span>
-            {% endif %}
-            <a href="{% url 'products:farmer_batch_detail' b.id %}" class="btn btn-sm btn-outline-success"><i class="bi bi-eye"></i></a>
-          </td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="7" class="text-center py-4 text-muted">暂无批次</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="table-responsive">
+      <table class="table table-hover mb-0">
+        <thead class="table-light">
+          <tr><th style="width:40px;"></th><th>批次编号</th><th>产品</th><th>农户</th><th>数量</th><th>状态</th><th>创建时间</th><th>操作</th></tr>
+        </thead>
+        <tbody>
+          {% for b in batches %}
+          <tr>
+            <td>
+              <button class="btn btn-sm btn-outline-secondary toggle-detail" data-target="detail-{{ b.pk }}" title="查看详情">
+                <i class="bi bi-chevron-down"></i>
+              </button>
+            </td>
+            <td>
+              {% if b.batch_code %}
+                <code>{{ b.batch_code }}</code>
+              {% else %}
+                <span class="text-muted">待审核#{{ b.pk }}</span>
+              {% endif %}
+            </td>
+            <td><strong>{{ b.product.name }}</strong></td>
+            <td>{{ b.product.farmer.user.username }}</td>
+            <td>{{ b.quantity }}</td>
+            <td>
+              {% if b.status == 'approved' %}<span class="badge bg-success">已通过</span>
+              {% elif b.status == 'pending' %}<span class="badge bg-warning text-dark">待审核</span>
+              {% elif b.status == 'rejected' %}<span class="badge bg-danger">未通过</span>
+              {% else %}<span class="badge bg-secondary">{{ b.status }}</span>{% endif %}
+            </td>
+            <td class="small">{{ b.created_at|date:'Y-m-d H:i' }}</td>
+            <td>
+              {% if b.status == 'pending' %}
+              <form method="post" action="{% url 'admin_panel:batch_review' b.id 'approve' %}" class="d-inline" onsubmit="return confirm('通过该批次审核？')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check"></i> 通过</button>
+              </form>
+              <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ b.id }}"><i class="bi bi-x"></i> 拒绝</button>
+              {% else %}
+              <span class="text-muted small">——</span>
+              {% endif %}
+              {% if b.batch_code %}
+              <a href="{% url 'traceability:trace' b.batch_code %}" class="btn btn-sm btn-outline-success ms-1" title="查看溯源"><i class="bi bi-qr-code"></i></a>
+              {% endif %}
+            </td>
+          </tr>
+          {# ── 展开详情行 ── #}
+          <tr id="detail-{{ b.pk }}" class="batch-detail-row" style="display:none;">
+            <td colspan="8" class="bg-light">
+              <div class="row p-3">
+                <div class="col-md-4">
+                  <h6 class="fw-bold mb-2"><i class="bi bi-info-circle text-success"></i> 批次详情</h6>
+                  <table class="table table-sm mb-0">
+                    <tr><td style="width:80px;"><strong>产品</strong></td><td>{{ b.product.name }}</td></tr>
+                    <tr><td><strong>分类</strong></td><td>{{ b.product.category|default:'未填写' }}</td></tr>
+                    <tr><td><strong>品种</strong></td><td>{{ b.product.variety|default:'未填写' }}</td></tr>
+                    <tr><td><strong>农户</strong></td><td>{{ b.product.farmer.user.username }} ({{ b.product.farmer.farm_name|default:'未设置店铺名' }})</td></tr>
+                    <tr><td><strong>零售价</strong></td><td>¥{{ b.product.price }} / {{ b.product.unit|default:'kg' }}</td></tr>
+                    {% if b.product.wholesale_price %}
+                    <tr><td><strong>批发价</strong></td><td>¥{{ b.product.wholesale_price }} / {{ b.product.unit|default:'kg' }}（满 {{ b.product.wholesale_min_quantity }} 起批）</td></tr>
+                    {% endif %}
+                  </table>
+                </div>
+                <div class="col-md-4">
+                  <h6 class="fw-bold mb-2"><i class="bi bi-clipboard-check text-warning"></i> 质量信息</h6>
+                  <table class="table table-sm mb-0">
+                    <tr><td style="width:80px;"><strong>数量</strong></td><td>{{ b.quantity }} {{ b.product.unit|default:'kg' }}</td></tr>
+                    <tr><td><strong>收获日期</strong></td><td>{{ b.harvest_date|date:'Y-m-d'|default:'未填写' }}</td></tr>
+                    <tr><td><strong>质检报告</strong></td><td>{{ b.qc_report|default:'未提交'|linebreaksbr }}</td></tr>
+                    {% if b.trace_info %}
+                      {% for key, val in b.trace_info.items %}
+                      <tr><td><strong>{{ key }}</strong></td><td>{{ val }}</td></tr>
+                      {% endfor %}
+                    {% endif %}
+                  </table>
+                </div>
+                <div class="col-md-4">
+                  <h6 class="fw-bold mb-2"><i class="bi bi-images text-primary"></i> 图片</h6>
+                  {% if b.images %}
+                    <div class="d-flex flex-wrap gap-2">
+                      {% for img in b.images %}
+                        <img src="{{ img }}" class="img-thumbnail" style="max-height:120px;max-width:160px;object-fit:cover;">
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <p class="text-muted small">无批次图片</p>
+                  {% endif %}
+                  {% if b.qc_images %}
+                    <h6 class="fw-bold mb-2 mt-2"><i class="bi bi-file-earmark-check text-info"></i> 质检图片</h6>
+                    <div class="d-flex flex-wrap gap-2">
+                      {% for img in b.qc_images %}
+                        <img src="{{ img }}" class="img-thumbnail" style="max-height:120px;max-width:160px;object-fit:cover;">
+                      {% endfor %}
+                    </div>
+                  {% endif %}
+                  {% if b.batch_code and b.qr_code %}
+                    <h6 class="fw-bold mb-2 mt-2"><i class="bi bi-qr-code text-success"></i> 溯源码</h6>
+                    <img src="{{ b.qr_code.url }}" class="img-thumbnail" style="max-height:120px;">
+                  {% elif b.batch_code %}
+                    <p class="text-muted small mt-2">二维码待生成</p>
+                  {% endif %}
+                  {% if b.batch_code %}
+                    <a href="{% url 'traceability:trace' b.batch_code %}" class="btn btn-sm btn-outline-success mt-2" target="_blank">
+                      <i class="bi bi-search"></i> 打开溯源页面
+                    </a>
+                  {% endif %}
+                </div>
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="8" class="text-center py-4 text-muted">暂无批次</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
+
+{# ── 模态框统一放在表格外面，避免嵌套在 td 中导致闪烁 ── #}
+{% for b in batches %}
+{% if b.status == 'pending' %}
+<div class="modal fade" id="rejectModal{{ b.id }}" tabindex="-1">
+  <div class="modal-dialog">
+    <form method="post" action="{% url 'admin_panel:batch_review' b.id 'reject' %}" class="modal-content">
+      {% csrf_token %}
+      <div class="modal-header">
+        <h5 class="modal-title">拒绝批次 {% if b.batch_code %}{{ b.batch_code }}{% else %}#{{ b.pk }}{% endif %}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label">拒绝原因</label>
+        <textarea name="note" class="form-control" rows="3" placeholder="填写拒绝原因..."></textarea>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-danger">确认拒绝</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+{% endfor %}
+
+<script>
+document.querySelectorAll('.toggle-detail').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const target = document.getElementById(this.dataset.target);
+    const icon = this.querySelector('i');
+    if (target.style.display === 'none') {
+      target.style.display = '';
+      icon.className = 'bi bi-chevron-up';
+    } else {
+      target.style.display = 'none';
+      icon.className = 'bi bi-chevron-down';
+    }
+  });
+});
+</script>
 {% endblock %}

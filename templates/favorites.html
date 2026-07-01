@@ -25,6 +25,9 @@
           <span class="badge bg-success bg-opacity-10 text-success mb-2">{{ fav.product.category|default:'农产品' }}</span>
           <div class="d-flex justify-content-between align-items-center">
             <span class="fw-bold text-success">¥{{ fav.product.price }}<small>/{{ fav.product.unit }}</small></span>
+            {% if fav.product.wholesale_price %}
+              <br><span class="badge bg-warning text-dark small">批发 ¥{{ fav.product.wholesale_price }} (满{{ fav.product.wholesale_min_quantity }})</span>
+            {% endif %}
             <a href="{% url 'products:detail' fav.product.id %}" class="btn btn-sm btn-outline-success">详情</a>
           </div>
           <form method="post" action="{% url 'trade:favorite_toggle' fav.product.id %}" class="mt-2">

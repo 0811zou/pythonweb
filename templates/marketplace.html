@@ -50,7 +50,14 @@
                 <p class="mb-1"><i class="bi bi-box text-muted"></i> {{ post.quantity }}{{ post.unit }}{% if post.price_range %} · {{ post.price_range }}{% endif %}</p>
                 <p class="mb-1"><i class="bi bi-geo-alt text-muted"></i> {{ post.region }}</p>
                 <p class="mb-0 small text-muted">{{ post.description|truncatechars:80 }}</p>
-                <small class="text-muted"><i class="bi bi-person"></i> {{ post.author.username }}</small>
+                <div class="d-flex justify-content-between align-items-center mt-2">
+                  <small class="text-muted"><i class="bi bi-person"></i> {{ post.author.username }}</small>
+                  <small class="text-success">
+                    {% if post.post_type == 'supply' %}<i class="bi bi-cart"></i> 立即购买
+                    {% elif is_farmer and user.farmerprofile.verified %}<i class="bi bi-reply-fill"></i> 我有货源
+                    {% else %}<i class="bi bi-chat-dots"></i> 查看详情{% endif %} →
+                  </small>
+                </div>
               </div>
             </div>
           </a>

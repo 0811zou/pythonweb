@@ -2,7 +2,7 @@
 {% block title %}入驻审核 - 管理后台{% endblock %}
 {% block body %}
 <h4 class="fw-bold mb-1"><i class="bi bi-person-plus"></i> 入驻申请审核</h4>
-<p class="text-muted mb-3">审核农户的入驻申请</p>
+<p class="text-muted mb-3">审核农户的入驻申请，查看证件材料后决定是否通过</p>
 
 <div class="d-flex gap-2 mb-3">
   <a href="?status=pending" class="btn btn-sm {% if status_filter == 'pending' %}btn-warning{% else %}btn-outline-warning{% endif %}">待审核</a>
@@ -16,11 +16,12 @@
   <table class="table table-hover">
     <thead>
       <tr>
+        <th style="width:36px;"></th>
         <th>类型</th>
         <th>名称</th>
         <th>电话</th>
         <th>地区</th>
-        <th>简介</th>
+        <th>证件</th>
         <th>时间</th>
         <th>状态</th>
         <th>操作</th>
@@ -29,11 +30,19 @@
     <tbody>
       {% for app in applications %}
       <tr>
+        <td>
+          <button class="btn btn-sm btn-outline-secondary toggle-app-detail" data-target="app-detail-{{ app.id }}" title="查看详情" style="padding:0 4px;font-size:11px;">
+            <i class="bi bi-chevron-down"></i>
+          </button>
+        </td>
         <td><span class="badge {% if app.apply_type == 'farmer' %}bg-primary{% else %}bg-info text-dark{% endif %}">{{ app.get_apply_type_display }}</span></td>
-        <td><strong>{{ app.name }}</strong></td>
+        <td><strong>{{ app.name }}</strong>{% if app.user %}<br><small class="text-muted">账号: {{ app.user.username }}</small>{% endif %}</td>
         <td>{{ app.phone }}</td>
         <td>{{ app.region }}</td>
-        <td><small>{{ app.description|truncatechars:40 }}</small></td>
+        <td>
+          {% if app.id_document %}<span class="badge bg-success">身份证 ✓</span>{% else %}<span class="badge bg-secondary">无</span>{% endif %}
+          {% if app.license_document %}<span class="badge bg-info">资质 ✓</span>{% endif %}
+        </td>
         <td><small>{{ app.created_at|date:'m-d H:i' }}</small></td>
         <td>
           <span class="badge {% if app.status == 'pending' %}bg-warning text-dark{% elif app.status == 'approved' %}bg-success{% else %}bg-danger{% endif %}">
@@ -42,11 +51,65 @@
         </td>
         <td>
           {% if app.status == 'pending' %}
-          <button class="btn btn-sm btn-success" onclick="reviewApp({{ app.id }}, 'approve', '{{ app.name|escapejs }}')" title="通过"><i class="bi bi-check-lg"></i></button>
-          <button class="btn btn-sm btn-danger" onclick="reviewApp({{ app.id }}, 'reject', '{{ app.name|escapejs }}')" title="拒绝"><i class="bi bi-x-lg"></i></button>
+          <button class="btn btn-sm btn-success" onclick="reviewApp({{ app.id }}, 'approve', '{{ app.name|escapejs }}')" title="通过"><i class="bi bi-check-lg"></i> 通过</button>
+          <button class="btn btn-sm btn-danger" onclick="reviewApp({{ app.id }}, 'reject', '{{ app.name|escapejs }}')" title="拒绝"><i class="bi bi-x-lg"></i> 拒绝</button>
           {% elif app.reviewer_note %}
-          <small class="text-muted">{{ app.reviewer_note|truncatechars:20 }}</small>
+          <small class="text-muted">{{ app.reviewer_note|truncatechars:30 }}</small>
           {% endif %}
+        </td>
+      </tr>
+      {# ── 展开详情行 ── #}
+      <tr id="app-detail-{{ app.id }}" class="app-detail-row" style="display:none;">
+        <td colspan="9" class="bg-light">
+          <div class="row p-3">
+            <div class="col-md-6">
+              <h6 class="fw-bold mb-2"><i class="bi bi-person"></i> 基本信息</h6>
+              <table class="table table-sm mb-3">
+                <tr><td style="width:80px;"><strong>申请人</strong></td><td>{{ app.name }}</td></tr>
+                <tr><td><strong>账号</strong></td><td>{{ app.user.username|default:'未关联' }}</td></tr>
+                <tr><td><strong>电话</strong></td><td>{{ app.phone }}</td></tr>
+                <tr><td><strong>地区</strong></td><td>{{ app.region }}</td></tr>
+                <tr><td><strong>简介</strong></td><td>{{ app.description|default:'未填写'|linebreaksbr }}</td></tr>
+                <tr><td><strong>提交时间</strong></td><td>{{ app.created_at|date:'Y-m-d H:i:s' }}</td></tr>
+                {% if app.reviewer_note %}
+                <tr><td><strong>审核备注</strong></td><td><span class="text-{% if app.status == 'approved' %}success{% else %}danger{% endif %}">{{ app.reviewer_note }}</span></td></tr>
+                {% endif %}
+              </table>
+            </div>
+            <div class="col-md-6">
+              <h6 class="fw-bold mb-2"><i class="bi bi-file-earmark-text"></i> 证件材料</h6>
+              <div class="row g-2">
+                <div class="col-6">
+                  <div class="card">
+                    <div class="card-header small">身份证/户口本</div>
+                    <div class="card-body text-center p-2">
+                      {% if app.id_document %}
+                        <a href="{{ app.id_document.url }}" target="_blank">
+                          <img src="{{ app.id_document.url }}" class="img-fluid rounded" style="max-height:200px;">
+                        </a>
+                      {% else %}
+                        <div class="text-muted py-4"><i class="bi bi-file-x" style="font-size:2rem;"></i><br>未上传</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div class="card">
+                    <div class="card-header small">营业执照/资质证明</div>
+                    <div class="card-body text-center p-2">
+                      {% if app.license_document %}
+                        <a href="{{ app.license_document.url }}" target="_blank">
+                          <img src="{{ app.license_document.url }}" class="img-fluid rounded" style="max-height:200px;">
+                        </a>
+                      {% else %}
+                        <div class="text-muted py-4"><i class="bi bi-file-x" style="font-size:2rem;"></i><br>未上传</div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </td>
       </tr>
       {% endfor %}
@@ -69,10 +132,26 @@
 </form>
 
 <script>
+// 展开详情
+document.querySelectorAll('.toggle-app-detail').forEach(btn => {
+  btn.addEventListener('click', function() {
+    const target = document.getElementById(this.dataset.target);
+    const icon = this.querySelector('i');
+    if (target.style.display === 'none') {
+      target.style.display = '';
+      icon.className = 'bi bi-chevron-up';
+    } else {
+      target.style.display = 'none';
+      icon.className = 'bi bi-chevron-down';
+    }
+  });
+});
+
 function reviewApp(id, action, name) {
-  const msg = action === 'approve' ? '确认通过「' + name + '」的申请？' : '确认拒绝「' + name + '」的申请？';
-  const note = prompt(msg + '\n可选：输入审核备注');
+  const msg = action === 'approve' ? '确认通过「' + name + '」的入驻申请？（通过后该农户即可上架产品）' : '确认拒绝「' + name + '」的申请？';
+  const note = prompt(msg + '\n请输入审核备注（必填）：');
   if (note === null) return;
+  if (!note.trim()) { alert('拒绝时必须填写原因！'); return; }
   document.getElementById('reviewAppId').value = id;
   document.getElementById('reviewAction').value = action;
   document.getElementById('reviewNote').value = note;
