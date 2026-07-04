@@ -24,6 +24,14 @@
   height: 100%; min-height: 300px; color: #aaa;
 }
 .default-hint i { font-size: 4rem; margin-bottom: 16px; }
+.spin {
+  animation: spin 0.8s linear infinite;
+  display: inline-block;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 @media (max-width: 768px) {
   .map-box { height: 420px; }
   .detail-box { max-height: none; }
@@ -42,7 +50,9 @@
           <h2 class="fw-bold mb-1"><i class="bi bi-geo-alt-fill text-success"></i> 产地分布图</h2>
           <p class="text-muted mb-0">点击地图上的省份，查看当地在售的特色农产品</p>
         </div>
-        <span class="badge bg-success fs-6 px-3 py-2"><i class="bi bi-arrow-repeat"></i> 实时数据</span>
+        <button class="btn btn-success px-3 py-2" id="refresh-map-btn" onclick="refreshMapData()">
+          <i class="bi bi-arrow-repeat" id="refresh-icon"></i> <span id="refresh-text">刷新数据</span>
+        </button>
       </div>
     </div>
 
@@ -75,34 +85,85 @@
 (function() {
   const mapDom = document.getElementById('china-map');
   const detailPanel = document.getElementById('detail-panel');
+  const refreshBtn = document.getElementById('refresh-map-btn');
+  const refreshIcon = document.getElementById('refresh-icon');
+  const refreshText = document.getElementById('refresh-text');
   let provinceData = {};
   let currentProvince = '';
+  let chart = null;
 
   function escapeHtml(value) {
     return String(value ?? '').replace(/[&<>"']/g, function(ch) {
-      return {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#39;'
-      }[ch];
+      return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[ch];
     });
   }
 
-  // 加载 GeoJSON 和数据
-  Promise.all([
-    fetch('https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json').then(r => r.json()),
-    fetch('/api/stats/province-products/').then(r => r.json()),
-  ])
-  .then(([geoJson, apiData]) => {
-    echarts.registerMap('china', geoJson);
+  function setLoading(loading) {
+    if (!refreshBtn) return;
+    refreshBtn.disabled = loading;
+    if (loading) {
+      refreshIcon.className = 'bi bi-arrow-repeat spin';
+      refreshText.textContent = '刷新中...';
+    } else {
+      refreshIcon.className = 'bi bi-arrow-repeat';
+      refreshText.textContent = '刷新数据';
+    }
+  }
+
+  // 渲染省份详情
+  function renderDetail(name, data) {
+    if (!data || !data.products || data.products.length === 0) {
+      detailPanel.innerHTML =
+        '<div class="default-hint">' +
+        '<i class="bi bi-geo-alt"></i>' +
+        '<h5 class="text-muted">' + escapeHtml(name) + '</h5>' +
+        '<p class="text-muted small">该省暂无在售产品</p>' +
+        '</div>';
+      return;
+    }
+    var cards = data.products.map(function(p) {
+      var imgHtml = p.image_url
+        ? '<img src="' + escapeHtml(p.image_url) + '" class="prod-img me-2" alt="' + escapeHtml(p.name) + '">'
+        : '<div class="prod-img-placeholder me-2"><i class="bi bi-basket"></i></div>';
+      return '<div class="card mb-2 border-0 bg-light">' +
+        '<div class="card-body py-2 px-3">' +
+        '<div class="d-flex align-items-center">' + imgHtml +
+        '<div class="flex-grow-1" style="min-width:0;">' +
+        '<h6 class="mb-0 text-truncate">' + escapeHtml(p.name) + '</h6>' +
+        '<small class="text-muted">' + escapeHtml(p.category) + ' | ¥' + escapeHtml(p.price) + '/' + escapeHtml(p.unit) + '</small>' +
+        '<br><small class="text-muted"><i class="bi bi-person"></i> ' + escapeHtml(p.farmer) + '</small>' +
+        '</div>' +
+        '<a href="/products/' + encodeURIComponent(p.id) + '/" class="btn btn-sm btn-outline-success ms-2 flex-shrink-0">详情</a>' +
+        '</div></div></div>';
+    }).join('');
+    detailPanel.innerHTML =
+      '<div class="card border-success mb-3">' +
+      '<div class="card-header bg-success text-white">' +
+      '<h5 class="mb-0"><i class="bi bi-geo-alt-fill"></i> ' + escapeHtml(name) + '</h5>' +
+      '</div>' +
+      '<div class="card-body">' +
+      '<p class="text-muted small mb-3">共 <strong>' + escapeHtml(data.product_count) + '</strong> 个产品, <strong>' + escapeHtml(data.farmers.length) + '</strong> 位农户</p>' +
+      cards +
+      '</div></div>';
+  }
+
+  function loadMapData() {
+    return Promise.all([
+      fetch('https://geo.datav.aliyun.com/areas_v3/bound/100000_full.json').then(function(r) { return r.json(); }),
+      fetch('/api/stats/province-products/').then(function(r) { return r.json(); }),
+    ]);
+  }
+
+  function renderMap(geoJson, apiData) {
+    if (chart) {
+      echarts.registerMap('china', geoJson);
+    } else {
+      echarts.registerMap('china', geoJson);
+      chart = echarts.init(mapDom);
+    }
     provinceData = apiData.provinces || {};
-    const mapData = apiData.map_data || [];
-
-    const chart = echarts.init(mapDom);
-    const maxVal = Math.max(...mapData.map(d => d.value), 1);
-
+    var mapData = apiData.map_data || [];
+    var maxVal = Math.max.apply(null, mapData.map(function(d) { return d.value; }).concat([1]));
 
     chart.setOption({
       tooltip: {
@@ -112,7 +173,6 @@
             return '<strong>' + escapeHtml(params.name) + '</strong><br/>产品数量: ' + escapeHtml(params.value);
           }
           return '<strong>' + escapeHtml(params.name) + '</strong><br/>暂无产品';
-
         }
       },
       visualMap: {
@@ -132,11 +192,7 @@
         map: 'china',
         roam: true,
         zoom: 1.2,
-        label: {
-          show: true,
-          color: '#333',
-          fontSize: 10
-        },
+        label: { show: true, color: '#333', fontSize: 10 },
         emphasis: {
           label: { show: true, fontSize: 13, fontWeight: 'bold' },
           itemStyle: { areaColor: '#ffd54f' }
@@ -150,60 +206,42 @@
       }]
     });
 
-    window.addEventListener('resize', () => chart.resize());
-
-    // 点击省份
+    // 重新绑定点击（先解绑再绑定，避免重复）
+    chart.off('click');
     chart.on('click', function(params) {
-      const name = params.name;
+      var name = params.name;
       if (name === currentProvince) return;
       currentProvince = name;
       renderDetail(name, provinceData[name]);
     });
-  })
-  .catch(function(err) {
-    console.error('地图加载失败:', err);
-    mapDom.innerHTML = '<div class="default-hint"><i class="bi bi-exclamation-triangle text-danger"></i><h5 class="text-danger">地图加载失败</h5><p class="text-muted small">请检查网络连接后刷新页面</p></div>';
-  });
 
-  // 渲染省份详情
-  function renderDetail(name, data) {
-    if (!data || !data.products || data.products.length === 0) {
-      detailPanel.innerHTML = `
-        <div class="default-hint">
-          <i class="bi bi-geo-alt"></i>
-          <h5 class="text-muted">${escapeHtml(name)}</h5>
-          <p class="text-muted small">该省暂无在售产品</p>
-        </div>`;
-      return;
+    // 选中之前的省份（如果还在）
+    if (currentProvince && provinceData[currentProvince]) {
+      renderDetail(currentProvince, provinceData[currentProvince]);
+      chart.dispatchAction({ type: 'select', name: currentProvince });
     }
-
-    const cards = data.products.map(function(p) {
-      const imgHtml = p.image_url
-        ? '<img src="' + escapeHtml(p.image_url) + '" class="prod-img me-2" alt="' + escapeHtml(p.name) + '">'
-        : '<div class="prod-img-placeholder me-2"><i class="bi bi-basket"></i></div>';
-      return '<div class="card mb-2 border-0 bg-light">' +
-        '<div class="card-body py-2 px-3">' +
-        '<div class="d-flex align-items-center">' + imgHtml +
-        '<div class="flex-grow-1" style="min-width:0;">' +
-        '<h6 class="mb-0 text-truncate">' + escapeHtml(p.name) + '</h6>' +
-        '<small class="text-muted">' + escapeHtml(p.category) + ' | ¥' + escapeHtml(p.price) + '/' + escapeHtml(p.unit) + '</small>' +
-        '<br><small class="text-muted"><i class="bi bi-person"></i> ' + escapeHtml(p.farmer) + '</small>' +
-        '</div>' +
-        '<a href="/products/' + encodeURIComponent(p.id) + '/" class="btn btn-sm btn-outline-success ms-2 flex-shrink-0">详情</a>' +
-        '</div></div></div>';
-    }).join('');
-
-    detailPanel.innerHTML =
-      '<div class="card border-success mb-3">' +
-      '<div class="card-header bg-success text-white">' +
-      '<h5 class="mb-0"><i class="bi bi-geo-alt-fill"></i> ' + escapeHtml(name) + '</h5>' +
-      '</div>' +
-      '<div class="card-body">' +
-      '<p class="text-muted small mb-3">共 <strong>' + escapeHtml(data.product_count) + '</strong> 个产品，<strong>' + escapeHtml(data.farmers.length) + '</strong> 位农户</p>' +
-      cards +
-      '</div></div>';
   }
 
+  function showError(err) {
+    console.error('地图加载失败:', err);
+    mapDom.innerHTML = '<div class="default-hint"><i class="bi bi-exclamation-triangle text-danger"></i><h5 class="text-danger">地图加载失败</h5><p class="text-muted small">请检查网络连接后刷新页面</p></div>';
+  }
+
+  // 初始加载
+  loadMapData()
+    .then(function(res) { renderMap(res[0], res[1]); })
+    .catch(showError);
+
+  window.addEventListener('resize', function() { if (chart) chart.resize(); });
+
+  // 暴露刷新函数到全局
+  window.refreshMapData = function() {
+    setLoading(true);
+    loadMapData()
+      .then(function(res) { renderMap(res[0], res[1]); })
+      .catch(showError)
+      .finally(function() { setLoading(false); });
+  };
 })();
 </script>
 {% endblock %}
